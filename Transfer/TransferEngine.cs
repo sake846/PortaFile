@@ -25,6 +25,9 @@ public sealed class TransferEngine
     private FileStream? _receiveFileStream;
     private string? _receivePartPath;
     private uint _receiveFileCrc;
+    private long _receiveBytesTransferred;
+    private long _receiveCurrentFileBytes;
+    private FileManifestEntry? _receiveCurrentEntry;
 
     public TransferEngine(
         SerialTransport transport,
@@ -391,6 +394,9 @@ public sealed class TransferEngine
     private Task HandleManifestAsync(TransferManifest manifest, CancellationToken cancellationToken)
     {
         _pendingManifest = manifest;
+        _receiveBytesTransferred = 0;
+        _receiveCurrentFileBytes = 0;
+        _receiveCurrentEntry = null;
         var blocks = manifest.Files.Sum(x => x.BlockCount);
         UpdateProgress(p => p.Reset("受信中", manifest.TotalBytes, blocks));
         return Task.CompletedTask;
@@ -410,6 +416,8 @@ public sealed class TransferEngine
         _receivePartPath = PathResolver.CreatePartPath(manifest, entry);
         _receiveFileStream = File.Create(_receivePartPath);
         _receiveFileCrc = payload.Crc32;
+        _receiveCurrentFileBytes = 0;
+        _receiveCurrentEntry = entry;
 
         UpdateProgress(p =>
         {
@@ -437,9 +445,11 @@ public sealed class TransferEngine
         }
 
         await _receiveFileStream.WriteAsync(packet.Payload, cancellationToken);
-        var total = Progress.BytesTransferred + packet.Payload.Length;
-        var currentFileBytes = _receiveFileStream.Length;
-        var currentEntry = _pendingManifest?.Files.FirstOrDefault(x => x.RelativePath == Progress.CurrentFile);
+        _receiveBytesTransferred += packet.Payload.Length;
+        _receiveCurrentFileBytes += packet.Payload.Length;
+        var total = _receiveBytesTransferred;
+        var currentFileBytes = _receiveCurrentFileBytes;
+        var currentEntry = _receiveCurrentEntry;
 
         UpdateProgress(p =>
         {
