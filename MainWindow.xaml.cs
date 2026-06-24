@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Windows;
 using System.Windows.Controls;
@@ -61,7 +62,6 @@ public partial class MainWindow : Window
             _engine.StartReceiving();
             SetConnected(true);
             _progress.Status = "接続済み";
-            ConnectionText.Text = $"{settings.PortName} / {settings.BaudRate}bps";
         }
         catch (Exception ex)
         {
@@ -75,7 +75,6 @@ public partial class MainWindow : Window
         _transport.Close();
         SetConnected(false);
         _progress.Status = "切断";
-        ConnectionText.Text = "未接続";
     }
 
     private async void Cancel_Click(object sender, RoutedEventArgs e)
@@ -83,6 +82,36 @@ public partial class MainWindow : Window
         CancelButton.IsEnabled = false;
         await _engine.CancelAsync();
         CancelButton.IsEnabled = _transport.IsOpen;
+    }
+
+    private async void SelectFile_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "送信するファイルを選択",
+            Multiselect = true
+        };
+
+        if (dialog.ShowDialog(this) == true)
+        {
+            await SendPathsAsync(dialog.FileNames);
+        }
+    }
+
+    private void OpenDownloads_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = PathResolver.DownloadsDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "保存場所を開けません", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void Window_DragOver(object sender, DragEventArgs e)
@@ -94,6 +123,14 @@ public partial class MainWindow : Window
     }
 
     private async void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            await SendPathsAsync((string[])e.Data.GetData(DataFormats.FileDrop)!);
+        }
+    }
+
+    private async Task SendPathsAsync(IEnumerable<string> paths)
     {
         if (!_transport.IsOpen)
         {
@@ -107,13 +144,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
-        {
-            return;
-        }
-
-        var paths = ((string[])e.Data.GetData(DataFormats.FileDrop)!).Where(path => File.Exists(path) || Directory.Exists(path)).ToArray();
-        if (paths.Length == 0)
+        var selectedPaths = paths.Where(path => File.Exists(path) || Directory.Exists(path)).ToArray();
+        if (selectedPaths.Length == 0)
         {
             return;
         }
@@ -121,7 +153,7 @@ public partial class MainWindow : Window
         CancelButton.IsEnabled = true;
         try
         {
-            await _engine.SendPathsAsync(paths);
+            await _engine.SendPathsAsync(selectedPaths);
         }
         catch (OperationCanceledException)
         {
@@ -181,6 +213,7 @@ public partial class MainWindow : Window
         DuplexComboBox.IsEnabled = !connected;
         HalfDuplexControlComboBox.IsEnabled = !connected;
         ReliabilityModeComboBox.IsEnabled = !connected;
+        SelectFileButton.IsEnabled = connected;
     }
 
     protected override void OnClosed(EventArgs e)

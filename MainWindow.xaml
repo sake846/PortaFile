@@ -188,6 +188,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <WrapPanel>
                     <TextBlock Text="COM" Margin="0,0,8,0" />
@@ -196,11 +197,19 @@
 
                     <TextBlock Text="速度" Margin="18,0,8,0" />
                     <ComboBox x:Name="BaudRateComboBox" />
+                </WrapPanel>
+
+                <WrapPanel Grid.Row="1" Margin="0,10,0,0">
+                    <TextBlock Text="転送方式" Margin="0,0,8,0" />
+                    <ComboBox x:Name="ReliabilityModeComboBox">
+                        <ComboBoxItem Content="ARQあり" Tag="{x:Static services:TransferReliabilityMode.Arq}" IsSelected="True" />
+                        <ComboBoxItem Content="ARQなし片方向" Tag="{x:Static services:TransferReliabilityMode.OneWay}" />
+                    </ComboBox>
 
                     <TextBlock Text="通信" Margin="18,0,8,0" />
                     <ComboBox x:Name="DuplexComboBox">
-                        <ComboBoxItem Content="全二重" Tag="{x:Static services:DuplexMode.FullDuplex}" IsSelected="True" />
-                        <ComboBoxItem Content="半二重" Tag="{x:Static services:DuplexMode.HalfDuplex}" />
+                        <ComboBoxItem Content="全二重" Tag="{x:Static services:DuplexMode.FullDuplex}" />
+                        <ComboBoxItem Content="半二重" Tag="{x:Static services:DuplexMode.HalfDuplex}" IsSelected="True" />
                     </ComboBox>
 
                     <TextBlock Text="半二重制御" Margin="18,0,8,0" />
@@ -208,20 +217,23 @@
                         <ComboBoxItem Content="ドライバ任せ" Tag="{x:Static services:HalfDuplexControl.DriverManaged}" IsSelected="True" />
                         <ComboBoxItem Content="RTS制御" Tag="{x:Static services:HalfDuplexControl.Rts}" />
                     </ComboBox>
-
-                    <TextBlock Text="転送方式" Margin="18,0,8,0" />
-                    <ComboBox x:Name="ReliabilityModeComboBox">
-                        <ComboBoxItem Content="ARQあり" Tag="{x:Static services:TransferReliabilityMode.Arq}" IsSelected="True" />
-                        <ComboBoxItem Content="ARQなし片方向" Tag="{x:Static services:TransferReliabilityMode.OneWay}" />
-                    </ComboBox>
                 </WrapPanel>
 
-                <WrapPanel Grid.Row="1" Margin="0,10,0,0">
-                    <Button x:Name="ConnectButton" Content="接続" Click="Connect_Click" />
-                    <Button x:Name="DisconnectButton" Content="切断" Click="Disconnect_Click" IsEnabled="False" />
-                    <Button x:Name="CancelButton" Content="キャンセル" Click="Cancel_Click" IsEnabled="False" />
-                    <TextBlock x:Name="ConnectionText" Margin="12,0,0,0" Foreground="#617181" Text="未接続" />
-                </WrapPanel>
+                <Grid Grid.Row="2" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <WrapPanel Grid.Column="0">
+                        <Button x:Name="ConnectButton" Content="接続" Click="Connect_Click" />
+                        <Button x:Name="DisconnectButton" Content="切断" Click="Disconnect_Click" IsEnabled="False" />
+                        <Button x:Name="CancelButton" Content="キャンセル" Click="Cancel_Click" IsEnabled="False" />
+                    </WrapPanel>
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
+                        <Button x:Name="SelectFileButton" Content="送信ファイルを選択" Click="SelectFile_Click" IsEnabled="False" MinWidth="130" />
+                        <Button Content="受信したフォルダを開く" Click="OpenDownloads_Click" MinWidth="130" />
+                    </WrapPanel>
+                </Grid>
             </Grid>
         </Border>
 
