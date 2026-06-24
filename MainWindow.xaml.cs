@@ -147,7 +147,8 @@ public partial class MainWindow : Window
             BaudRate = BaudRateComboBox.SelectedItem is int baudRate ? baudRate : 115200,
             Parity = GetTag<Parity>(ParityComboBox),
             DuplexMode = GetTag<DuplexMode>(DuplexComboBox),
-            HalfDuplexControl = GetTag<HalfDuplexControl>(HalfDuplexControlComboBox)
+            HalfDuplexControl = GetTag<HalfDuplexControl>(HalfDuplexControlComboBox),
+            ReliabilityMode = GetTag<TransferReliabilityMode>(ReliabilityModeComboBox)
         };
     }
 
@@ -180,6 +181,7 @@ public partial class MainWindow : Window
         ParityComboBox.IsEnabled = !connected;
         DuplexComboBox.IsEnabled = !connected;
         HalfDuplexControlComboBox.IsEnabled = !connected;
+        ReliabilityModeComboBox.IsEnabled = !connected;
     }
 
     protected override void OnClosed(EventArgs e)

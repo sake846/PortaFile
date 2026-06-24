@@ -60,6 +60,8 @@ public sealed class TransferProgress : INotifyPropertyChanged
     private int _errorCount;
     private DateTime? _dataStartedAt;
     private DateTime? _lastDataAt;
+    private TimeSpan? _lastSendDuration;
+    private TimeSpan? _lastAckWaitDuration;
 
     public ObservableCollection<ProgressBlock> Blocks { get; } = [];
 
@@ -140,10 +142,16 @@ public sealed class TransferProgress : INotifyPropertyChanged
         }
     }
 
+    public string SendDurationText => FormatDuration(_lastSendDuration);
+
+    public string AckWaitDurationText => FormatDuration(_lastAckWaitDuration);
+
     public void Reset(string status, long totalBytes, int blocks)
     {
         _dataStartedAt = null;
         _lastDataAt = null;
+        _lastSendDuration = null;
+        _lastAckWaitDuration = null;
         Status = status;
         CurrentFile = "";
         TotalBytes = totalBytes;
@@ -157,6 +165,14 @@ public sealed class TransferProgress : INotifyPropertyChanged
         {
             Blocks.Add(new ProgressBlock());
         }
+    }
+
+    public void SetLinkTiming(TimeSpan sendDuration, TimeSpan ackWaitDuration)
+    {
+        _lastSendDuration = sendDuration;
+        _lastAckWaitDuration = ackWaitDuration;
+        OnPropertyChanged(nameof(SendDurationText));
+        OnPropertyChanged(nameof(AckWaitDurationText));
     }
 
     public void SetBlock(int index, BlockState state)
@@ -182,6 +198,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
         return $"{value:0.##} {units[unit]}";
     }
+
+    private static string FormatDuration(TimeSpan? duration) =>
+        duration is null ? "-" : $"{duration.Value.TotalMilliseconds:0.0} ms";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

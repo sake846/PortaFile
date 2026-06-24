@@ -1,5 +1,6 @@
 using PortaFile.Protocol;
 using PortaFile.Services;
+using System.Diagnostics;
 using System.Security.Cryptography;
 
 namespace PortaFile.Transfer;
@@ -28,6 +29,7 @@ public sealed class TransferEngine
     private long _receiveBytesTransferred;
     private long _receiveCurrentFileBytes;
     private FileManifestEntry? _receiveCurrentEntry;
+    private TransferReliabilityMode _activeReceiveReliabilityMode = TransferReliabilityMode.Arq;
 
     public TransferEngine(
         SerialTransport transport,
@@ -80,8 +82,9 @@ public sealed class TransferEngine
             UpdateProgress(p => p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount));
 
             _readyWaiter = NewWaiter();
+            var reliabilityMode = _settingsProvider().ReliabilityMode;
             await SendJsonAsync(PacketType.SendRequest, built.Manifest.TransferId, 0,
-                new SendRequestPayload(_nodeId, built.Manifest.TransferId, built.Manifest.RootName, built.Manifest.Files.Count, built.Manifest.TotalBytes),
+                new SendRequestPayload(_nodeId, built.Manifest.TransferId, built.Manifest.RootName, built.Manifest.Files.Count, built.Manifest.TotalBytes, reliabilityMode),
                 cancellationToken);
 
             if (!await WaitWithTimeoutAsync(_readyWaiter.Task, TimeSpan.FromSeconds(5), cancellationToken))
@@ -90,7 +93,15 @@ public sealed class TransferEngine
             }
 
             await SendJsonAsync(PacketType.Manifest, built.Manifest.TransferId, 0, built.Manifest, cancellationToken);
-            await SendFilesAsync(built.Manifest, built.SourceFiles, cancellationToken);
+            if (reliabilityMode == TransferReliabilityMode.OneWay)
+            {
+                await SendFilesOneWayAsync(built.Manifest, built.SourceFiles, cancellationToken);
+            }
+            else
+            {
+                await SendFilesAsync(built.Manifest, built.SourceFiles, cancellationToken);
+            }
+
             await SendJsonAsync(PacketType.TransferEnd, built.Manifest.TransferId, 0, new { }, cancellationToken);
 
             UpdateProgress(p =>
@@ -190,6 +201,62 @@ public sealed class TransferEngine
         }
     }
 
+    private async Task SendFilesOneWayAsync(TransferManifest manifest, List<string> sources, CancellationToken cancellationToken)
+    {
+        var globalBlockIndex = 0;
+        var transferred = 0L;
+        var sequence = 1;
+
+        for (var fileIndex = 0; fileIndex < manifest.Files.Count; fileIndex++)
+        {
+            var entry = manifest.Files[fileIndex];
+            var sourcePath = sources[fileIndex];
+
+            UpdateProgress(p =>
+            {
+                p.Status = "送信中(ARQなし)";
+                p.CurrentFile = entry.RelativePath;
+                p.FilePercent = 0;
+            });
+
+            await SendJsonAsync(PacketType.FileStart, manifest.TransferId, sequence++,
+                new FileStartPayload(entry.Index, entry.RelativePath, entry.Size, entry.Crc32), cancellationToken);
+
+            await using var stream = File.OpenRead(sourcePath);
+            var buffer = new byte[TransferConstants.BlockSize];
+            var fileTransferred = 0L;
+
+            while (true)
+            {
+                var read = await stream.ReadAsync(buffer, cancellationToken);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                var payload = buffer.AsSpan(0, read).ToArray();
+                var sendDuration = await SendMeasuredAsync(
+                    new Packet(PacketType.Data, manifest.TransferId, sequence++, payload),
+                    cancellationToken);
+
+                transferred += read;
+                fileTransferred += read;
+                var blockIndex = globalBlockIndex++;
+                UpdateProgress(p =>
+                {
+                    p.SetLinkTiming(sendDuration, TimeSpan.Zero);
+                    p.BytesTransferred = transferred;
+                    p.OverallPercent = manifest.TotalBytes == 0 ? 100 : transferred * 100.0 / manifest.TotalBytes;
+                    p.FilePercent = entry.Size == 0 ? 100 : fileTransferred * 100.0 / entry.Size;
+                    p.SetBlock(blockIndex, BlockState.Done);
+                });
+            }
+
+            await SendJsonAsync(PacketType.FileEnd, manifest.TransferId, sequence++,
+                new FileEndPayload(entry.Index, entry.Crc32), cancellationToken);
+        }
+    }
+
     private async Task SendControlWithRetryAsync<T>(
         PacketType type,
         Guid transferId,
@@ -205,9 +272,12 @@ public sealed class TransferEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
             var waiter = RegisterAckWaiter(sequence);
-            await _transport.SendAsync(packet, _settingsProvider(), cancellationToken);
+            var sendDuration = await SendMeasuredAsync(packet, cancellationToken);
 
+            var ackStopwatch = Stopwatch.StartNew();
             var ok = await WaitWithTimeoutAsync(waiter.Task, CalculateTimeout(_settingsProvider().BaudRate), cancellationToken);
+            ackStopwatch.Stop();
+            UpdateProgress(p => p.SetLinkTiming(sendDuration, ackStopwatch.Elapsed));
             if (ok && waiter.Task.Result)
             {
                 return;
@@ -244,9 +314,14 @@ public sealed class TransferEngine
 
             UpdateProgress(p => p.SetBlock(blockIndex, retries == 0 ? BlockState.Active : BlockState.Retrying));
             var waiter = RegisterAckWaiter(sequence);
-            await _transport.SendAsync(new Packet(PacketType.Data, transferId, sequence, payload), _settingsProvider(), cancellationToken);
+            var sendDuration = await SendMeasuredAsync(
+                new Packet(PacketType.Data, transferId, sequence, payload),
+                cancellationToken);
 
+            var ackStopwatch = Stopwatch.StartNew();
             var ok = await WaitWithTimeoutAsync(waiter.Task, CalculateTimeout(_settingsProvider().BaudRate), cancellationToken);
+            ackStopwatch.Stop();
+            UpdateProgress(p => p.SetLinkTiming(sendDuration, ackStopwatch.Elapsed));
             if (ok && waiter.Task.Result)
             {
                 UpdateProgress(p => p.SetBlock(blockIndex, BlockState.Done));
@@ -318,8 +393,12 @@ public sealed class TransferEngine
         if (!packet.IsValid)
         {
             UpdateProgress(p => p.ErrorCount++);
-            await SendJsonAsync(PacketType.Nak, packet.TransferId, 0,
-                new NakPayload(_expectedReceiveSequence, "CRC不一致"), cancellationToken);
+            if (!IsActiveReceiveOneWay())
+            {
+                await SendJsonAsync(PacketType.Nak, packet.TransferId, 0,
+                    new NakPayload(_expectedReceiveSequence, "CRC不一致"), cancellationToken);
+            }
+
             return;
         }
 
@@ -386,8 +465,10 @@ public sealed class TransferEngine
         }
 
         SetBusy(true);
+        _activeReceiveReliabilityMode = request.ReliabilityMode;
         _expectedReceiveSequence = 1;
-        UpdateProgress(p => p.Reset("受信準備完了", request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize))));
+        var status = IsActiveReceiveOneWay() ? "受信準備完了(ARQなし)" : "受信準備完了";
+        UpdateProgress(p => p.Reset(status, request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize))));
         await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), cancellationToken);
     }
 
@@ -398,7 +479,7 @@ public sealed class TransferEngine
         _receiveCurrentFileBytes = 0;
         _receiveCurrentEntry = null;
         var blocks = manifest.Files.Sum(x => x.BlockCount);
-        UpdateProgress(p => p.Reset("受信中", manifest.TotalBytes, blocks));
+        UpdateProgress(p => p.Reset(IsActiveReceiveOneWay() ? "受信中(ARQなし)" : "受信中", manifest.TotalBytes, blocks));
         return Task.CompletedTask;
     }
 
@@ -425,8 +506,11 @@ public sealed class TransferEngine
             p.FilePercent = 0;
         });
 
-        _expectedReceiveSequence++;
-        await AckAsync(transferId, sequence, cancellationToken);
+        _expectedReceiveSequence = sequence + 1;
+        if (!IsActiveReceiveOneWay())
+        {
+            await AckAsync(transferId, sequence, cancellationToken);
+        }
     }
 
     private async Task HandleDataAsync(Packet packet, CancellationToken cancellationToken)
@@ -439,8 +523,12 @@ public sealed class TransferEngine
 
         if (_receiveFileStream is null)
         {
-            await SendJsonAsync(PacketType.Nak, packet.TransferId, 0,
-                new NakPayload(_expectedReceiveSequence, "FILE_START未受信です。"), cancellationToken);
+            if (!IsActiveReceiveOneWay())
+            {
+                await SendJsonAsync(PacketType.Nak, packet.TransferId, 0,
+                    new NakPayload(_expectedReceiveSequence, "FILE_START未受信です。"), cancellationToken);
+            }
+
             return;
         }
 
@@ -459,8 +547,11 @@ public sealed class TransferEngine
             p.SetBlock(Math.Max(0, _expectedReceiveSequence - 2), BlockState.Done);
         });
 
-        _expectedReceiveSequence++;
-        await AckAsync(packet.TransferId, packet.Sequence, cancellationToken);
+        _expectedReceiveSequence = packet.Sequence + 1;
+        if (!IsActiveReceiveOneWay())
+        {
+            await AckAsync(packet.TransferId, packet.Sequence, cancellationToken);
+        }
     }
 
     private async Task HandleFileEndAsync(FileEndPayload payload, int sequence, Guid transferId, CancellationToken cancellationToken)
@@ -473,8 +564,12 @@ public sealed class TransferEngine
 
         if (_receiveFileStream is null || _receivePartPath is null)
         {
-            await SendJsonAsync(PacketType.Nak, transferId, 0,
-                new NakPayload(_expectedReceiveSequence, "受信ファイルがありません。"), cancellationToken);
+            if (!IsActiveReceiveOneWay())
+            {
+                await SendJsonAsync(PacketType.Nak, transferId, 0,
+                    new NakPayload(_expectedReceiveSequence, "受信ファイルがありません。"), cancellationToken);
+            }
+
             return;
         }
 
@@ -487,8 +582,19 @@ public sealed class TransferEngine
         {
             File.Delete(_receivePartPath);
             _receivePartPath = null;
-            await SendJsonAsync(PacketType.FileError, transferId, sequence, new ErrorPayload("ファイルCRC不一致"), cancellationToken);
-            await SendJsonAsync(PacketType.Nak, transferId, 0, new NakPayload(sequence, "ファイルCRC不一致"), cancellationToken);
+            UpdateProgress(p =>
+            {
+                p.Status = "受信CRCエラー";
+                p.CurrentFile = "ファイルCRC不一致";
+                p.ErrorCount++;
+            });
+
+            if (!IsActiveReceiveOneWay())
+            {
+                await SendJsonAsync(PacketType.FileError, transferId, sequence, new ErrorPayload("ファイルCRC不一致"), cancellationToken);
+                await SendJsonAsync(PacketType.Nak, transferId, 0, new NakPayload(sequence, "ファイルCRC不一致"), cancellationToken);
+            }
+
             return;
         }
 
@@ -501,9 +607,13 @@ public sealed class TransferEngine
         }
 
         _receivePartPath = null;
-        _expectedReceiveSequence++;
-        await AckAsync(transferId, sequence, cancellationToken);
-        UpdateProgress(p => p.Status = "受信中");
+        _expectedReceiveSequence = sequence + 1;
+        if (!IsActiveReceiveOneWay())
+        {
+            await AckAsync(transferId, sequence, cancellationToken);
+        }
+
+        UpdateProgress(p => p.Status = IsActiveReceiveOneWay() ? "受信中(ARQなし)" : "受信中");
     }
 
     private bool ValidateSequence(int sequence, Guid transferId, CancellationToken cancellationToken, out Task recoveryTask)
@@ -515,10 +625,20 @@ public sealed class TransferEngine
         }
 
         UpdateProgress(p => p.ErrorCount++);
+        if (IsActiveReceiveOneWay())
+        {
+            _expectedReceiveSequence = sequence;
+            recoveryTask = Task.CompletedTask;
+            return true;
+        }
+
         recoveryTask = SendJsonAsync(PacketType.Nak, transferId, 0,
             new NakPayload(_expectedReceiveSequence, $"想定外シーケンス {sequence}"), cancellationToken);
         return false;
     }
+
+    private bool IsActiveReceiveOneWay() =>
+        _activeReceiveReliabilityMode == TransferReliabilityMode.OneWay;
 
     private Task AckAsync(Guid transferId, int sequence, CancellationToken cancellationToken) =>
         SendJsonAsync(PacketType.Ack, transferId, 0, new AckPayload(sequence), cancellationToken);
@@ -557,6 +677,14 @@ public sealed class TransferEngine
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, _jsonOptions);
         return _transport.SendAsync(new Packet(type, transferId, sequence, bytes), _settingsProvider(), cancellationToken);
+    }
+
+    private async Task<TimeSpan> SendMeasuredAsync(Packet packet, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        await _transport.SendAsync(packet, _settingsProvider(), cancellationToken);
+        stopwatch.Stop();
+        return stopwatch.Elapsed;
     }
 
     private T ReadJson<T>(byte[] payload) =>

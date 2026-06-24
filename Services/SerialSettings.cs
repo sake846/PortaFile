@@ -14,6 +14,12 @@ public enum HalfDuplexControl
     Rts
 }
 
+public enum TransferReliabilityMode
+{
+    Arq,
+    OneWay
+}
+
 public sealed class SerialSettings
 {
     public string PortName { get; set; } = "";
@@ -21,4 +27,5 @@ public sealed class SerialSettings
     public Parity Parity { get; set; } = Parity.None;
     public DuplexMode DuplexMode { get; set; } = DuplexMode.FullDuplex;
     public HalfDuplexControl HalfDuplexControl { get; set; } = HalfDuplexControl.DriverManaged;
+    public TransferReliabilityMode ReliabilityMode { get; set; } = TransferReliabilityMode.Arq;
 }

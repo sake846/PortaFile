@@ -1,7 +1,15 @@
+using PortaFile.Services;
+
 namespace PortaFile.Transfer;
 
 public sealed record HelloPayload(ulong NodeId);
-public sealed record SendRequestPayload(ulong NodeId, Guid TransferId, string RootName, int FileCount, long TotalBytes);
+public sealed record SendRequestPayload(
+    ulong NodeId,
+    Guid TransferId,
+    string RootName,
+    int FileCount,
+    long TotalBytes,
+    TransferReliabilityMode ReliabilityMode);
 public sealed record ReadyPayload(ulong NodeId);
 public sealed record BusyPayload(ulong NodeId, string Reason);
 public sealed record FileStartPayload(int FileIndex, string RelativePath, long Size, uint Crc32);

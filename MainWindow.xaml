@@ -32,6 +32,87 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="8,5" />
             <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="DropDownToggle"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="ComboBorder"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="30" />
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                  Margin="{TemplateBinding Padding}"
+                                                                  HorizontalAlignment="Left"
+                                                                  VerticalAlignment="Center"
+                                                                  Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  RecognizesAccessKey="True" />
+                                                <Path Grid.Column="1"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"
+                                                      Fill="{StaticResource ControlTextBrush}"
+                                                      Data="M 0 0 L 4 4 L 8 0 Z" />
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ComboBorder" Property="Background" Value="{StaticResource ControlHoverBrush}" />
+                                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="#5C6B78" />
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="ComboBorder" Property="Background" Value="{StaticResource ControlPressedBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="ComboBorder" Property="Background" Value="{StaticResource ControlDisabledBrush}" />
+                                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="#2A343D" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <Popup x:Name="Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border Background="{StaticResource ControlBackgroundBrush}"
+                                        BorderBrush="{StaticResource ControlBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource ControlMutedTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{StaticResource ControlTextBrush}" />
@@ -148,6 +229,12 @@
                         <ComboBoxItem Content="ドライバ任せ" Tag="{x:Static services:HalfDuplexControl.DriverManaged}" IsSelected="True" />
                         <ComboBoxItem Content="RTS制御" Tag="{x:Static services:HalfDuplexControl.Rts}" />
                     </ComboBox>
+
+                    <TextBlock Text="転送方式" Margin="18,0,8,0" />
+                    <ComboBox x:Name="ReliabilityModeComboBox">
+                        <ComboBoxItem Content="ARQあり" Tag="{x:Static services:TransferReliabilityMode.Arq}" IsSelected="True" />
+                        <ComboBoxItem Content="ARQなし片方向" Tag="{x:Static services:TransferReliabilityMode.OneWay}" />
+                    </ComboBox>
                 </WrapPanel>
 
                 <WrapPanel Grid.Row="1" Margin="0,10,0,0">
@@ -222,6 +309,8 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="状態" Foreground="#AEB8C1" />
@@ -242,6 +331,14 @@
                 <StackPanel Grid.Column="4">
                     <TextBlock Text="エラー" Foreground="#AEB8C1" />
                     <TextBlock Text="{Binding ErrorCount}" />
+                </StackPanel>
+                <StackPanel Grid.Column="5">
+                    <TextBlock Text="送信I/O" Foreground="#AEB8C1" />
+                    <TextBlock Text="{Binding SendDurationText}" />
+                </StackPanel>
+                <StackPanel Grid.Column="6">
+                    <TextBlock Text="ACK待ち" Foreground="#AEB8C1" />
+                    <TextBlock Text="{Binding AckWaitDurationText}" />
                 </StackPanel>
             </Grid>
         </Border>
