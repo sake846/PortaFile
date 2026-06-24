@@ -41,12 +41,12 @@ public sealed class ProgressBlock : INotifyPropertyChanged
 
     public Brush Fill => State switch
     {
-        BlockState.Active => Brushes.DodgerBlue,
-        BlockState.Done => Brushes.SeaGreen,
-        BlockState.Retrying => Brushes.Goldenrod,
-        BlockState.Failed => Brushes.Firebrick,
-        BlockState.Verifying => Brushes.MediumPurple,
-        _ => Brushes.DimGray
+        BlockState.Active => new SolidColorBrush(Color.FromRgb(42, 112, 184)),
+        BlockState.Done => new SolidColorBrush(Color.FromRgb(47, 142, 100)),
+        BlockState.Retrying => new SolidColorBrush(Color.FromRgb(190, 128, 36)),
+        BlockState.Failed => new SolidColorBrush(Color.FromRgb(185, 56, 56)),
+        BlockState.Verifying => new SolidColorBrush(Color.FromRgb(126, 87, 194)),
+        _ => new SolidColorBrush(Color.FromRgb(203, 213, 225))
     };
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -169,16 +169,16 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public Brush DirectionAccent => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(74, 144, 226)),
-        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(47, 158, 115)),
-        _ => new SolidColorBrush(Color.FromRgb(58, 70, 80))
+        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(35, 112, 184)),
+        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(47, 142, 100)),
+        _ => new SolidColorBrush(Color.FromRgb(142, 157, 171))
     };
 
     public Brush DirectionPanelBackground => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(20, 34, 51)),
-        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(18, 41, 34)),
-        _ => new SolidColorBrush(Color.FromRgb(23, 32, 41))
+        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(232, 242, 252)),
+        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(230, 247, 239)),
+        _ => new SolidColorBrush(Color.FromRgb(248, 251, 253))
     };
 
     public void Reset(string status, long totalBytes, int blocks)
