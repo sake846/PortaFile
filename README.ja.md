@@ -72,17 +72,20 @@ PortaFile では以下の設定を扱います。
 
 ```text
 PortaFile/
-├─ MainWindow.xaml
-├─ MainWindow.xaml.cs
+├─ Models/
 ├─ Protocol/
 ├─ Services/
 ├─ Transfer/
+├─ ViewModels/
+├─ Views/
 └─ docs/
 ```
 
-- `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面と画面操作のロジック
+- `Views/`: WPF の画面定義。`MainWindow.xaml.cs` は ViewModel 生成とドラッグ＆ドロップなど View 固有イベントの橋渡し
+- `ViewModels/`: 画面状態、コマンド、バインディング用モデル
+- `Models/`: ViewModel から参照する表示・選択用モデル
 - `Protocol/`: パケット種別、パケットのエンコード / デコード、CRC-32
-- `Services/`: シリアルポート設定と通信処理
+- `Services/`: シリアルポート設定、通信処理、Windowsダイアログ連携
 - `Transfer/`: マニフェスト作成、保存先パス解決、進捗管理、転送エンジン
 - `docs/requirements.md`: 機能要件
 

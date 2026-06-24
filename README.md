@@ -76,17 +76,20 @@ Supported baud rate candidates:
 
 ```text
 PortaFile/
-├─ MainWindow.xaml
-├─ MainWindow.xaml.cs
+├─ Models/
 ├─ Protocol/
 ├─ Services/
 ├─ Transfer/
+├─ ViewModels/
+├─ Views/
 └─ docs/
 ```
 
-- `MainWindow.xaml` / `MainWindow.xaml.cs`: main WPF UI and interaction logic
+- `Views/`: WPF views. `MainWindow.xaml.cs` only creates the ViewModel and bridges view-specific events such as drag and drop
+- `ViewModels/`: screen state, commands, and binding logic
+- `Models/`: display and selection models used by ViewModels
 - `Protocol/`: packet types, packet encoding, and CRC-32 support
-- `Services/`: serial port settings and transport layer
+- `Services/`: serial port settings, transport layer, and Windows dialog integration
 - `Transfer/`: manifest creation, path resolution, progress, and transfer engine
 - `docs/requirements.md`: functional requirements
 
