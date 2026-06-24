@@ -58,7 +58,8 @@ public sealed class TransferProgress : INotifyPropertyChanged
     private long _totalBytes;
     private int _retryCount;
     private int _errorCount;
-    private DateTime _startedAt = DateTime.UtcNow;
+    private DateTime? _dataStartedAt;
+    private DateTime? _lastDataAt;
 
     public ObservableCollection<ProgressBlock> Blocks { get; } = [];
 
@@ -91,8 +92,16 @@ public sealed class TransferProgress : INotifyPropertyChanged
         get => _bytesTransferred;
         set
         {
+            var previous = _bytesTransferred;
             if (SetField(ref _bytesTransferred, value))
             {
+                if (value > previous)
+                {
+                    var now = DateTime.UtcNow;
+                    _dataStartedAt ??= now;
+                    _lastDataAt = now;
+                }
+
                 OnPropertyChanged(nameof(SpeedText));
             }
         }
@@ -120,14 +129,21 @@ public sealed class TransferProgress : INotifyPropertyChanged
     {
         get
         {
-            var seconds = Math.Max(1, (DateTime.UtcNow - _startedAt).TotalSeconds);
+            if (_dataStartedAt is null)
+            {
+                return "-";
+            }
+
+            var through = _lastDataAt ?? DateTime.UtcNow;
+            var seconds = Math.Max(0.1, (through - _dataStartedAt.Value).TotalSeconds);
             return FormatBytes((long)(BytesTransferred / seconds)) + "/s";
         }
     }
 
     public void Reset(string status, long totalBytes, int blocks)
     {
-        _startedAt = DateTime.UtcNow;
+        _dataStartedAt = null;
+        _lastDataAt = null;
         Status = status;
         CurrentFile = "";
         TotalBytes = totalBytes;
