@@ -1,3 +1,5 @@
+using PortaFile.Services;
+
 namespace PortaFile.Transfer;
 
 public sealed class TransferManifest
@@ -5,6 +7,7 @@ public sealed class TransferManifest
     public Guid TransferId { get; set; }
     public string RootName { get; set; } = "Transfer";
     public long TotalBytes { get; set; }
+    public TransferReliabilityMode ReliabilityMode { get; set; } = TransferReliabilityMode.Arq;
     public List<FileManifestEntry> Files { get; set; } = [];
 }
 

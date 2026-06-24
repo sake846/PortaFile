@@ -21,6 +21,7 @@ public sealed class TransferEngine
     private TransferManifest? _pendingManifest;
     private List<string> _pendingSources = [];
     private TaskCompletionSource<bool>? _readyWaiter;
+    private Guid? _expectedManifestTransferId;
     private int _expectedReceiveSequence;
     private bool _isBusy;
     private FileStream? _receiveFileStream;
@@ -78,18 +79,26 @@ public sealed class TransferEngine
             _pendingManifest = built.Manifest;
             _pendingSources = built.SourceFiles;
             var blockCount = built.Manifest.Files.Sum(f => f.BlockCount);
-
-            UpdateProgress(p => p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount));
-
-            _readyWaiter = NewWaiter();
             var reliabilityMode = _settingsProvider().ReliabilityMode;
-            await SendJsonAsync(PacketType.SendRequest, built.Manifest.TransferId, 0,
-                new SendRequestPayload(_nodeId, built.Manifest.TransferId, built.Manifest.RootName, built.Manifest.Files.Count, built.Manifest.TotalBytes, reliabilityMode),
-                cancellationToken);
+            built.Manifest.ReliabilityMode = reliabilityMode;
 
-            if (!await WaitWithTimeoutAsync(_readyWaiter.Task, TimeSpan.FromSeconds(5), cancellationToken))
+            if (reliabilityMode == TransferReliabilityMode.OneWay)
             {
-                throw new TimeoutException("送信要求がタイムアウトしました。");
+                UpdateProgress(p => p.Reset("片方向送信中", built.Manifest.TotalBytes, blockCount));
+            }
+            else
+            {
+                UpdateProgress(p => p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount));
+
+                _readyWaiter = NewWaiter();
+                await SendJsonAsync(PacketType.SendRequest, built.Manifest.TransferId, 0,
+                    new SendRequestPayload(_nodeId, built.Manifest.TransferId, built.Manifest.RootName, built.Manifest.Files.Count, built.Manifest.TotalBytes, reliabilityMode),
+                    cancellationToken);
+
+                if (!await WaitWithTimeoutAsync(_readyWaiter.Task, TimeSpan.FromSeconds(5), cancellationToken))
+                {
+                    throw new TimeoutException("送信要求がタイムアウトしました。");
+                }
             }
 
             await SendJsonAsync(PacketType.Manifest, built.Manifest.TransferId, 0, built.Manifest, cancellationToken);
@@ -123,6 +132,7 @@ public sealed class TransferEngine
     public async Task CancelAsync()
     {
         _transferCts?.Cancel();
+        _expectedManifestTransferId = null;
         try
         {
             await SendJsonAsync(PacketType.Cancel, _pendingManifest?.TransferId ?? Guid.Empty, 0,
@@ -142,6 +152,7 @@ public sealed class TransferEngine
     {
         _receiveCts?.Cancel();
         _transferCts?.Cancel();
+        _expectedManifestTransferId = null;
     }
 
     private async Task SendFilesAsync(TransferManifest manifest, List<string> sources, CancellationToken cancellationToken)
@@ -433,11 +444,13 @@ public sealed class TransferEngine
                 break;
             case PacketType.TransferEnd:
                 UpdateProgress(p => p.Status = "受信完了");
+                _pendingManifest = null;
                 SetBusy(false);
                 break;
             case PacketType.Cancel:
                 await CleanupReceiveFileAsync(deletePart: true);
                 UpdateProgress(p => p.Status = "相手側がキャンセル");
+                _pendingManifest = null;
                 SetBusy(false);
                 break;
             case PacketType.Error:
@@ -466,6 +479,7 @@ public sealed class TransferEngine
 
         SetBusy(true);
         _activeReceiveReliabilityMode = request.ReliabilityMode;
+        _expectedManifestTransferId = transferId;
         _expectedReceiveSequence = 1;
         var status = IsActiveReceiveOneWay() ? "受信準備完了(ARQなし)" : "受信準備完了";
         UpdateProgress(p => p.Reset(status, request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize))));
@@ -474,7 +488,33 @@ public sealed class TransferEngine
 
     private Task HandleManifestAsync(TransferManifest manifest, CancellationToken cancellationToken)
     {
+        if (_expectedManifestTransferId is Guid expectedTransferId && expectedTransferId != manifest.TransferId)
+        {
+            UpdateProgress(p =>
+            {
+                p.Status = "受信要求無視";
+                p.CurrentFile = "想定外のマニフェストです。";
+                p.ErrorCount++;
+            });
+            return Task.CompletedTask;
+        }
+
+        if (_isBusy && _expectedManifestTransferId is null && _pendingManifest is not null)
+        {
+            UpdateProgress(p =>
+            {
+                p.Status = "受信要求無視";
+                p.CurrentFile = "転送中です。";
+                p.ErrorCount++;
+            });
+            return Task.CompletedTask;
+        }
+
+        _expectedManifestTransferId = null;
+        SetBusy(true);
+        _activeReceiveReliabilityMode = manifest.ReliabilityMode;
         _pendingManifest = manifest;
+        _expectedReceiveSequence = 1;
         _receiveBytesTransferred = 0;
         _receiveCurrentFileBytes = 0;
         _receiveCurrentEntry = null;
