@@ -250,12 +250,45 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" MinHeight="118" BorderBrush="{Binding Progress.DirectionAccent}" BorderThickness="2" CornerRadius="6" Padding="18"
-                    Background="{Binding Progress.DirectionPanelBackground}">
+            <Border Grid.Row="0" MinHeight="118" BorderThickness="2" CornerRadius="6" Padding="18">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{Binding Progress.DirectionAccent}" />
+                        <Setter Property="Background" Value="{Binding Progress.DirectionPanelBackground}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                <Setter Property="BorderBrush" Value="#C8D1DA" />
+                                <Setter Property="Background" Value="#EEF2F5" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="ファイルまたはフォルダをドロップ" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="ファイルまたはフォルダをドロップ" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                <Setter Property="Foreground" Value="#17212B" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                        <Setter Property="Foreground" Value="#8E9DAB" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <TextBlock Text="接続済みの相手へ、相対パスと更新日時を保持して送信します"
-                               Foreground="#617181" Margin="0,8,0,0" HorizontalAlignment="Center" />
+                               Margin="0,8,0,0" HorizontalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                <Setter Property="Foreground" Value="#617181" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                        <Setter Property="Foreground" Value="#9AA7B4" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </StackPanel>
             </Border>
 
