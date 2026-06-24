@@ -7,8 +7,11 @@ namespace PortaFile.Transfer;
 
 public sealed class TransferEngine
 {
+    public const int NegotiationBaudRate = 38400;
+
     private readonly SerialTransport _transport;
     private readonly Func<SerialSettings> _settingsProvider;
+    private readonly Action<SerialSettings> _applyRemoteSettings;
     private readonly Func<string, Task<bool>> _confirmRetryAsync;
     private readonly Action<Action> _ui;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -49,12 +52,14 @@ public sealed class TransferEngine
     public TransferEngine(
         SerialTransport transport,
         Func<SerialSettings> settingsProvider,
+        Action<SerialSettings> applyRemoteSettings,
         TransferProgress progress,
         Func<string, Task<bool>> confirmRetryAsync,
         Action<Action> ui)
     {
         _transport = transport;
         _settingsProvider = settingsProvider;
+        _applyRemoteSettings = applyRemoteSettings;
         Progress = progress;
         _confirmRetryAsync = confirmRetryAsync;
         _ui = ui;
@@ -94,7 +99,8 @@ public sealed class TransferEngine
             _pendingManifest = built.Manifest;
             _pendingSources = built.SourceFiles;
             var blockCount = built.Manifest.Files.Sum(f => f.BlockCount);
-            var reliabilityMode = _settingsProvider().ReliabilityMode;
+            var transferSettings = _settingsProvider();
+            var reliabilityMode = transferSettings.ReliabilityMode;
             built.Manifest.ReliabilityMode = reliabilityMode;
 
             if (reliabilityMode == TransferReliabilityMode.OneWay)
@@ -106,14 +112,27 @@ public sealed class TransferEngine
                 UpdateProgress(p => p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount));
 
                 _readyWaiter = NewWaiter();
+                var negotiationSettings = WithBaudRate(transferSettings, NegotiationBaudRate);
                 await SendJsonAsync(PacketType.SendRequest, built.Manifest.TransferId, 0,
-                    new SendRequestPayload(_nodeId, built.Manifest.TransferId, built.Manifest.RootName, built.Manifest.Files.Count, built.Manifest.TotalBytes, reliabilityMode),
+                    new SendRequestPayload(
+                        _nodeId,
+                        built.Manifest.TransferId,
+                        built.Manifest.RootName,
+                        built.Manifest.Files.Count,
+                        built.Manifest.TotalBytes,
+                        reliabilityMode,
+                        transferSettings.BaudRate,
+                        transferSettings.DuplexMode),
+                    negotiationSettings,
                     cancellationToken);
 
                 if (!await WaitWithTimeoutAsync(_readyWaiter.Task, TimeSpan.FromSeconds(5), cancellationToken))
                 {
                     throw new TimeoutException("送信要求がタイムアウトしました。");
                 }
+
+                await Task.Delay(100, cancellationToken);
+                _transport.SetBaudRate(transferSettings.BaudRate);
             }
 
             await SendJsonAsync(PacketType.Manifest, built.Manifest.TransferId, 0, built.Manifest, cancellationToken);
@@ -138,6 +157,7 @@ public sealed class TransferEngine
         }
         finally
         {
+            ResetNegotiationBaudRateIfNeeded();
             _pendingManifest = null;
             _pendingSources = [];
             _readyWaiter = null;
@@ -590,6 +610,7 @@ public sealed class TransferEngine
                     p.Status = "受信完了";
                 });
                 _pendingManifest = null;
+                ResetNegotiationBaudRateIfNeeded();
                 SetBusy(false);
                 break;
             case PacketType.Cancel:
@@ -600,6 +621,7 @@ public sealed class TransferEngine
                     p.Status = "相手側がキャンセル";
                 });
                 _pendingManifest = null;
+                ResetNegotiationBaudRateIfNeeded();
                 SetBusy(false);
                 break;
             case PacketType.Error:
@@ -617,7 +639,8 @@ public sealed class TransferEngine
     {
         if (_isBusy && (_pendingManifest is null || request.NodeId > _nodeId))
         {
-            await SendJsonAsync(PacketType.Busy, transferId, 0, new BusyPayload(_nodeId, "転送中です。"), cancellationToken);
+            await SendJsonAsync(PacketType.Busy, transferId, 0, new BusyPayload(_nodeId, "転送中です。"),
+                WithBaudRate(_settingsProvider(), NegotiationBaudRate), cancellationToken);
             return;
         }
 
@@ -633,12 +656,24 @@ public sealed class TransferEngine
         _receiveDataBuffer.Clear();
         _receiveNextBlockIndex = 0;
         var status = IsActiveReceiveOneWay() ? "受信準備完了(ARQなし)" : "受信準備完了";
+        var currentSettings = _settingsProvider();
+        var transferSettings = new SerialSettings
+        {
+            PortName = currentSettings.PortName,
+            BaudRate = request.BaudRate > 0 ? request.BaudRate : currentSettings.BaudRate,
+            Parity = currentSettings.Parity,
+            DuplexMode = request.DuplexMode,
+            HalfDuplexControl = currentSettings.HalfDuplexControl,
+            ReliabilityMode = request.ReliabilityMode
+        };
         UpdateProgress(p =>
         {
             p.Direction = TransferDirection.Receiving;
             p.Reset(status, request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize)));
         });
-        await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), cancellationToken);
+        await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), WithBaudRate(currentSettings, NegotiationBaudRate), cancellationToken);
+        _ui(() => _applyRemoteSettings(transferSettings));
+        _transport.SetBaudRate(transferSettings.BaudRate);
     }
 
     private Task HandleManifestAsync(TransferManifest manifest, CancellationToken cancellationToken)
@@ -945,8 +980,13 @@ public sealed class TransferEngine
 
     private Task SendJsonAsync<T>(PacketType type, Guid transferId, int sequence, T payload, CancellationToken cancellationToken)
     {
+        return SendJsonAsync(type, transferId, sequence, payload, _settingsProvider(), cancellationToken);
+    }
+
+    private Task SendJsonAsync<T>(PacketType type, Guid transferId, int sequence, T payload, SerialSettings settings, CancellationToken cancellationToken)
+    {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, _jsonOptions);
-        return _transport.SendAsync(new Packet(type, transferId, sequence, bytes), _settingsProvider(), cancellationToken);
+        return _transport.SendAsync(new Packet(type, transferId, sequence, bytes), settings, cancellationToken);
     }
 
     private async Task<TimeSpan> SendMeasuredAsync(Packet packet, CancellationToken cancellationToken)
@@ -1003,4 +1043,25 @@ public sealed class TransferEngine
         var seconds = TransferConstants.BlockSize * 10.0 / Math.Max(1, baudRate) + 2;
         return TimeSpan.FromSeconds(Math.Max(3, seconds));
     }
+
+    private void ResetNegotiationBaudRateIfNeeded()
+    {
+        if (!_transport.IsOpen || _settingsProvider().ReliabilityMode != TransferReliabilityMode.Arq)
+        {
+            return;
+        }
+
+        _transport.SetBaudRate(NegotiationBaudRate);
+    }
+
+    private static SerialSettings WithBaudRate(SerialSettings settings, int baudRate) =>
+        new()
+        {
+            PortName = settings.PortName,
+            BaudRate = baudRate,
+            Parity = settings.Parity,
+            DuplexMode = settings.DuplexMode,
+            HalfDuplexControl = settings.HalfDuplexControl,
+            ReliabilityMode = settings.ReliabilityMode
+        };
 }

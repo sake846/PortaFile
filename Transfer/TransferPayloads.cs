@@ -9,7 +9,9 @@ public sealed record SendRequestPayload(
     string RootName,
     int FileCount,
     long TotalBytes,
-    TransferReliabilityMode ReliabilityMode);
+    TransferReliabilityMode ReliabilityMode,
+    int BaudRate,
+    DuplexMode DuplexMode);
 public sealed record ReadyPayload(ulong NodeId);
 public sealed record BusyPayload(ulong NodeId, string Reason);
 public sealed record FileStartPayload(int FileIndex, string RelativePath, long Size, uint Crc32);

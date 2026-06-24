@@ -13,6 +13,8 @@
         <SolidColorBrush x:Key="ControlBorderBrush" Color="#B8C4CF" />
         <SolidColorBrush x:Key="ControlTextBrush" Color="#17212B" />
         <SolidColorBrush x:Key="ControlMutedTextBrush" Color="#7A8794" />
+        <SolidColorBrush x:Key="ConnectedAccentBrush" Color="#0F8B8D" />
+        <SolidColorBrush x:Key="ConnectedPanelBackgroundBrush" Color="#E6F7F8" />
         <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF" />
         <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FFFFFF" />
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#2370B8" />
@@ -257,6 +259,14 @@
                         <Setter Property="BorderBrush" Value="{Binding Progress.DirectionAccent}" />
                         <Setter Property="Background" Value="{Binding Progress.DirectionPanelBackground}" />
                         <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsConnected}" Value="True" />
+                                    <Condition Binding="{Binding Progress.Direction}" Value="Idle" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="BorderBrush" Value="{StaticResource ConnectedAccentBrush}" />
+                                <Setter Property="Background" Value="{StaticResource ConnectedPanelBackgroundBrush}" />
+                            </MultiDataTrigger>
                             <DataTrigger Binding="{Binding IsConnected}" Value="False">
                                 <Setter Property="BorderBrush" Value="#C8D1DA" />
                                 <Setter Property="Background" Value="#EEF2F5" />
@@ -270,6 +280,13 @@
                             <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                                 <Setter Property="Foreground" Value="#17212B" />
                                 <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsConnected}" Value="True" />
+                                            <Condition Binding="{Binding Progress.Direction}" Value="Idle" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Foreground" Value="{StaticResource ConnectedAccentBrush}" />
+                                    </MultiDataTrigger>
                                     <DataTrigger Binding="{Binding IsConnected}" Value="False">
                                         <Setter Property="Foreground" Value="#8E9DAB" />
                                     </DataTrigger>
@@ -303,14 +320,44 @@
                         <TextBlock Text="全体" Width="96" />
                         <TextBlock Text="{Binding Progress.OverallPercent, StringFormat={}{0:0.0}%}" HorizontalAlignment="Right" DockPanel.Dock="Right" />
                     </DockPanel>
-                    <ProgressBar Value="{Binding Progress.OverallPercent}" Maximum="100" Foreground="{Binding Progress.DirectionAccent}" />
+                    <ProgressBar Value="{Binding Progress.OverallPercent}" Maximum="100">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                                <Setter Property="Foreground" Value="{Binding Progress.DirectionAccent}" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsConnected}" Value="True" />
+                                            <Condition Binding="{Binding Progress.Direction}" Value="Idle" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Foreground" Value="{StaticResource ConnectedAccentBrush}" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="8,0,0,0">
                     <DockPanel>
                         <TextBlock Text="現在ファイル" Width="96" />
                         <TextBlock Text="{Binding Progress.FilePercent, StringFormat={}{0:0.0}%}" HorizontalAlignment="Right" DockPanel.Dock="Right" />
                     </DockPanel>
-                    <ProgressBar Value="{Binding Progress.FilePercent}" Maximum="100" Foreground="{Binding Progress.DirectionAccent}" />
+                    <ProgressBar Value="{Binding Progress.FilePercent}" Maximum="100">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                                <Setter Property="Foreground" Value="{Binding Progress.DirectionAccent}" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsConnected}" Value="True" />
+                                            <Condition Binding="{Binding Progress.Direction}" Value="Idle" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Foreground" Value="{StaticResource ConnectedAccentBrush}" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
                 </StackPanel>
             </Grid>
 
@@ -345,7 +392,25 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="状態" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.Status}" FontWeight="SemiBold" Foreground="{Binding Progress.DirectionAccent}" />
+                    <TextBlock Text="{Binding Progress.Status}" FontWeight="SemiBold">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                <Setter Property="Foreground" Value="{Binding Progress.DirectionAccent}" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsConnected}" Value="True" />
+                                            <Condition Binding="{Binding Progress.Direction}" Value="Idle" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Foreground" Value="{StaticResource ConnectedAccentBrush}" />
+                                    </MultiDataTrigger>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                        <Setter Property="Foreground" Value="#8E9DAB" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </StackPanel>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="現在のファイル" Foreground="#617181" />
