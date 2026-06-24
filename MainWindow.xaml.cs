@@ -145,7 +145,7 @@ public partial class MainWindow : Window
         {
             PortName = PortComboBox.SelectedItem as string ?? "",
             BaudRate = BaudRateComboBox.SelectedItem is int baudRate ? baudRate : 115200,
-            Parity = GetTag<Parity>(ParityComboBox),
+            Parity = Parity.None,
             DuplexMode = GetTag<DuplexMode>(DuplexComboBox),
             HalfDuplexControl = GetTag<HalfDuplexControl>(HalfDuplexControlComboBox),
             ReliabilityMode = GetTag<TransferReliabilityMode>(ReliabilityModeComboBox)
@@ -178,7 +178,6 @@ public partial class MainWindow : Window
         CancelButton.IsEnabled = connected;
         PortComboBox.IsEnabled = !connected;
         BaudRateComboBox.IsEnabled = !connected;
-        ParityComboBox.IsEnabled = !connected;
         DuplexComboBox.IsEnabled = !connected;
         HalfDuplexControlComboBox.IsEnabled = !connected;
         ReliabilityModeComboBox.IsEnabled = !connected;
