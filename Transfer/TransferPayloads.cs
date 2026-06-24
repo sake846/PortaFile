@@ -16,4 +16,6 @@ public sealed record FileStartPayload(int FileIndex, string RelativePath, long S
 public sealed record FileEndPayload(int FileIndex, uint Crc32);
 public sealed record AckPayload(int Sequence);
 public sealed record NakPayload(int ExpectedSequence, string Reason);
+public sealed record DataBatchCheckPayload(int[] Sequences);
+public sealed record DataBatchAckPayload(int[] MissingSequences);
 public sealed record ErrorPayload(string Message);

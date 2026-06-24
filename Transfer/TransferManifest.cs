@@ -24,5 +24,6 @@ public sealed class FileManifestEntry
 public static class TransferConstants
 {
     public const int BlockSize = 10 * 1024;
+    public const int ArqWindowSize = 10;
     public const int MaxRetries = 10;
 }

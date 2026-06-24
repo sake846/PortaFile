@@ -16,5 +16,7 @@ public enum PacketType : byte
     FileError = 12,
     TransferEnd = 13,
     Cancel = 14,
-    Error = 15
+    Error = 15,
+    DataBatchCheck = 16,
+    DataBatchAck = 17
 }
