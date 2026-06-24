@@ -12,6 +12,13 @@ public enum BlockState
     Verifying
 }
 
+public enum TransferDirection
+{
+    Idle,
+    Sending,
+    Receiving
+}
+
 public sealed class ProgressBlock : INotifyPropertyChanged
 {
     private BlockState _state;
@@ -62,6 +69,7 @@ public sealed class TransferProgress : INotifyPropertyChanged
     private DateTime? _lastDataAt;
     private TimeSpan? _lastSendDuration;
     private TimeSpan? _lastAckWaitDuration;
+    private TransferDirection _direction;
 
     public ObservableCollection<ProgressBlock> Blocks { get; } = [];
 
@@ -145,6 +153,33 @@ public sealed class TransferProgress : INotifyPropertyChanged
     public string SendDurationText => FormatDuration(_lastSendDuration);
 
     public string AckWaitDurationText => FormatDuration(_lastAckWaitDuration);
+
+    public TransferDirection Direction
+    {
+        get => _direction;
+        set
+        {
+            if (SetField(ref _direction, value))
+            {
+                OnPropertyChanged(nameof(DirectionAccent));
+                OnPropertyChanged(nameof(DirectionPanelBackground));
+            }
+        }
+    }
+
+    public Brush DirectionAccent => Direction switch
+    {
+        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(74, 144, 226)),
+        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(47, 158, 115)),
+        _ => new SolidColorBrush(Color.FromRgb(58, 70, 80))
+    };
+
+    public Brush DirectionPanelBackground => Direction switch
+    {
+        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(20, 34, 51)),
+        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(18, 41, 34)),
+        _ => new SolidColorBrush(Color.FromRgb(23, 32, 41))
+    };
 
     public void Reset(string status, long totalBytes, int blocks)
     {

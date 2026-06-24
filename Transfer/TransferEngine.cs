@@ -71,6 +71,7 @@ public sealed class TransferEngine
         {
             UpdateProgress(p =>
             {
+                p.Direction = TransferDirection.Sending;
                 p.Status = "マニフェスト作成中";
                 p.CurrentFile = "";
             });
@@ -115,6 +116,7 @@ public sealed class TransferEngine
 
             UpdateProgress(p =>
             {
+                p.Direction = TransferDirection.Idle;
                 p.Status = "送信完了";
                 p.OverallPercent = 100;
                 p.FilePercent = 100;
@@ -144,7 +146,11 @@ public sealed class TransferEngine
         }
 
         await CleanupReceiveFileAsync(deletePart: true);
-        UpdateProgress(p => p.Status = "キャンセル");
+        UpdateProgress(p =>
+        {
+            p.Direction = TransferDirection.Idle;
+            p.Status = "キャンセル";
+        });
         SetBusy(false);
     }
 
@@ -443,13 +449,21 @@ public sealed class TransferEngine
                 CompleteAck(ReadJson<NakPayload>(packet.Payload).ExpectedSequence, false);
                 break;
             case PacketType.TransferEnd:
-                UpdateProgress(p => p.Status = "受信完了");
+                UpdateProgress(p =>
+                {
+                    p.Direction = TransferDirection.Idle;
+                    p.Status = "受信完了";
+                });
                 _pendingManifest = null;
                 SetBusy(false);
                 break;
             case PacketType.Cancel:
                 await CleanupReceiveFileAsync(deletePart: true);
-                UpdateProgress(p => p.Status = "相手側がキャンセル");
+                UpdateProgress(p =>
+                {
+                    p.Direction = TransferDirection.Idle;
+                    p.Status = "相手側がキャンセル";
+                });
                 _pendingManifest = null;
                 SetBusy(false);
                 break;
@@ -482,7 +496,11 @@ public sealed class TransferEngine
         _expectedManifestTransferId = transferId;
         _expectedReceiveSequence = 1;
         var status = IsActiveReceiveOneWay() ? "受信準備完了(ARQなし)" : "受信準備完了";
-        UpdateProgress(p => p.Reset(status, request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize))));
+        UpdateProgress(p =>
+        {
+            p.Direction = TransferDirection.Receiving;
+            p.Reset(status, request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize)));
+        });
         await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), cancellationToken);
     }
 
@@ -519,7 +537,11 @@ public sealed class TransferEngine
         _receiveCurrentFileBytes = 0;
         _receiveCurrentEntry = null;
         var blocks = manifest.Files.Sum(x => x.BlockCount);
-        UpdateProgress(p => p.Reset(IsActiveReceiveOneWay() ? "受信中(ARQなし)" : "受信中", manifest.TotalBytes, blocks));
+        UpdateProgress(p =>
+        {
+            p.Direction = TransferDirection.Receiving;
+            p.Reset(IsActiveReceiveOneWay() ? "受信中(ARQなし)" : "受信中", manifest.TotalBytes, blocks);
+        });
         return Task.CompletedTask;
     }
 
