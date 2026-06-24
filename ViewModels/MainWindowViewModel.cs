@@ -17,12 +17,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private TransferReliabilityMode _selectedReliabilityMode = TransferReliabilityMode.Arq;
     private DuplexMode _selectedDuplexMode = DuplexMode.HalfDuplex;
     private HalfDuplexControl _selectedHalfDuplexControl = HalfDuplexControl.DriverManaged;
+    private string? _sendFileDirectory;
     private bool _isConnected;
     private bool _isDisposed;
 
     public MainWindowViewModel(IUserDialogService dialogs, Action<Action> ui)
     {
         _dialogs = dialogs;
+        ApplyLastState(ApplicationLastState.Load());
         _engine = new TransferEngine(
             _transport,
             GetSerialSettings,
@@ -184,14 +186,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         var ports = SerialPort.GetPortNames().OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
 
         PortNames.Clear();
+        if (selected is not null && !ports.Contains(selected))
+        {
+            PortNames.Add(selected);
+        }
+
         foreach (var port in ports)
         {
             PortNames.Add(port);
         }
 
-        SelectedPortName = selected is not null && ports.Contains(selected)
-            ? selected
-            : ports.FirstOrDefault();
+        SelectedPortName = selected ?? ports.FirstOrDefault();
     }
 
     private void Connect()
@@ -232,9 +237,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private async Task SelectFilesAsync()
     {
-        var files = _dialogs.SelectFiles("送信するファイルを選択");
+        var files = _dialogs.SelectFiles("送信するファイルを選択", _sendFileDirectory);
         if (files.Length > 0)
         {
+            _sendFileDirectory = Path.GetDirectoryName(files[0]);
+            SaveLastState();
             await SendPathsAsync(files);
         }
     }
@@ -264,6 +271,37 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         };
     }
 
+    private void ApplyLastState(ApplicationLastState state)
+    {
+        _selectedPortName = state.PortName;
+        _selectedBaudRate = BaudRates.Contains(state.BaudRate) ? state.BaudRate : 115200;
+        _selectedReliabilityMode = state.ReliabilityMode;
+        _selectedDuplexMode = state.DuplexMode;
+        _selectedHalfDuplexControl = state.HalfDuplexControl;
+        _sendFileDirectory = Directory.Exists(state.SendFileDirectory) ? state.SendFileDirectory : null;
+    }
+
+    private void SaveLastState()
+    {
+        try
+        {
+            new ApplicationLastState
+            {
+                PortName = SelectedPortName,
+                BaudRate = SelectedBaudRate,
+                Parity = Parity.None,
+                DuplexMode = SelectedDuplexMode,
+                HalfDuplexControl = SelectedHalfDuplexControl,
+                ReliabilityMode = SelectedReliabilityMode,
+                SendFileDirectory = _sendFileDirectory
+            }.Save();
+        }
+        catch
+        {
+            // Last-state persistence should never block application shutdown.
+        }
+    }
+
     private void RaiseCommandStates()
     {
         ConnectCommand.RaiseCanExecuteChanged();
@@ -280,6 +318,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         _isDisposed = true;
+        SaveLastState();
         _speedTimer.Stop();
         _engine.Stop();
         _transport.Dispose();

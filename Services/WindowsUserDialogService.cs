@@ -27,13 +27,17 @@ public sealed class WindowsUserDialogService : IUserDialogService
         return Task.FromResult(result == MessageBoxResult.Yes);
     }
 
-    public string[] SelectFiles(string title)
+    public string[] SelectFiles(string title, string? initialDirectory)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = title,
             Multiselect = true
         };
+        if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
+        {
+            dialog.InitialDirectory = initialDirectory;
+        }
 
         return dialog.ShowDialog(_owner) == true ? dialog.FileNames : [];
     }
