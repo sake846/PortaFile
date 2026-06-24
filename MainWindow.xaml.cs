@@ -21,7 +21,7 @@ public partial class MainWindow : Window
         DataContext = _progress;
         _engine = new TransferEngine(
             _transport,
-            GetSerialSettings,
+            GetSerialSettingsOnUiThread,
             _progress,
             ConfirmRetryAsync,
             action => Dispatcher.Invoke(action));
@@ -150,6 +150,11 @@ public partial class MainWindow : Window
             HalfDuplexControl = GetTag<HalfDuplexControl>(HalfDuplexControlComboBox)
         };
     }
+
+    private SerialSettings GetSerialSettingsOnUiThread() =>
+        Dispatcher.CheckAccess()
+            ? GetSerialSettings()
+            : Dispatcher.Invoke(GetSerialSettings);
 
     private T GetTag<T>(ComboBox comboBox)
     {
