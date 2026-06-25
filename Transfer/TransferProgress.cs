@@ -63,6 +63,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
     private double _filePercent;
     private long _bytesTransferred;
     private long _totalBytes;
+    private string _transferName = "";
+    private int _transferFileCount;
+    private int _transferFolderCount;
     private int _retryCount;
     private int _errorCount;
     private DateTime? _dataStartedAt;
@@ -123,6 +126,24 @@ public sealed class TransferProgress : INotifyPropertyChanged
         set => SetField(ref _totalBytes, value);
     }
 
+    public string TransferName
+    {
+        get => _transferName;
+        set => SetField(ref _transferName, value);
+    }
+
+    public int TransferFileCount
+    {
+        get => _transferFileCount;
+        set => SetField(ref _transferFileCount, value);
+    }
+
+    public int TransferFolderCount
+    {
+        get => _transferFolderCount;
+        set => SetField(ref _transferFolderCount, value);
+    }
+
     public int RetryCount
     {
         get => _retryCount;
@@ -153,6 +174,30 @@ public sealed class TransferProgress : INotifyPropertyChanged
     public string SendDurationText => FormatDuration(_lastSendDuration);
 
     public string AckWaitDurationText => FormatDuration(_lastAckWaitDuration);
+
+    public string DropZoneTitle =>
+        Direction is TransferDirection.Sending or TransferDirection.Receiving && !string.IsNullOrWhiteSpace(Status)
+            ? Status
+            : "ファイルまたはフォルダをドロップ";
+
+    public string DropZoneSummary
+    {
+        get
+        {
+            if (Direction is not (TransferDirection.Sending or TransferDirection.Receiving))
+            {
+                return "接続済みの相手へ、相対パスと更新日時を保持して送信します";
+            }
+
+            var name = string.IsNullOrWhiteSpace(TransferName) ? "転送対象" : TransferName;
+            var itemText = TransferFolderCount > 0
+                ? $"ファイル {TransferFileCount} / フォルダ {TransferFolderCount}"
+                : $"ファイル {TransferFileCount}";
+            var sizeText = $"{FormatBytes(BytesTransferred)} / {FormatBytes(TotalBytes)}";
+            var currentText = string.IsNullOrWhiteSpace(CurrentFile) ? "" : $" / 現在: {CurrentFile}";
+            return $"{name} / {itemText} / 総サイズ {sizeText}{currentText}";
+        }
+    }
 
     public TransferDirection Direction
     {
@@ -189,6 +234,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
         _lastAckWaitDuration = null;
         Status = status;
         CurrentFile = "";
+        TransferName = "";
+        TransferFileCount = 0;
+        TransferFolderCount = 0;
         TotalBytes = totalBytes;
         BytesTransferred = 0;
         OverallPercent = 0;
@@ -200,6 +248,13 @@ public sealed class TransferProgress : INotifyPropertyChanged
         {
             Blocks.Add(new ProgressBlock());
         }
+    }
+
+    public void SetTransferDetails(TransferManifest manifest)
+    {
+        TransferName = manifest.RootName;
+        TransferFileCount = manifest.Files.Count;
+        TransferFolderCount = manifest.RootFolderCount;
     }
 
     public void SetLinkTiming(TimeSpan sendDuration, TimeSpan ackWaitDuration)
@@ -248,8 +303,23 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
         field = value;
         OnPropertyChanged(propertyName);
+        if (AffectsDropZone(propertyName))
+        {
+            OnPropertyChanged(nameof(DropZoneTitle));
+            OnPropertyChanged(nameof(DropZoneSummary));
+        }
         return true;
     }
+
+    private static bool AffectsDropZone(string? propertyName) =>
+        propertyName is nameof(Status)
+            or nameof(CurrentFile)
+            or nameof(BytesTransferred)
+            or nameof(TotalBytes)
+            or nameof(Direction)
+            or nameof(TransferName)
+            or nameof(TransferFileCount)
+            or nameof(TransferFolderCount);
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

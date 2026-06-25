@@ -6,6 +6,8 @@ public sealed class TransferManifest
 {
     public Guid TransferId { get; set; }
     public string RootName { get; set; } = "Transfer";
+    public int RootFileCount { get; set; }
+    public int RootFolderCount { get; set; }
     public long TotalBytes { get; set; }
     public TransferReliabilityMode ReliabilityMode { get; set; } = TransferReliabilityMode.Arq;
     public List<FileManifestEntry> Files { get; set; } = [];

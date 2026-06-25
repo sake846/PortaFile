@@ -105,11 +105,19 @@ public sealed class TransferEngine
 
             if (reliabilityMode == TransferReliabilityMode.OneWay)
             {
-                UpdateProgress(p => p.Reset("片方向送信中", built.Manifest.TotalBytes, blockCount));
+                UpdateProgress(p =>
+                {
+                    p.Reset("片方向送信中", built.Manifest.TotalBytes, blockCount);
+                    p.SetTransferDetails(built.Manifest);
+                });
             }
             else
             {
-                UpdateProgress(p => p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount));
+                UpdateProgress(p =>
+                {
+                    p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount);
+                    p.SetTransferDetails(built.Manifest);
+                });
 
                 _readyWaiter = NewWaiter();
                 var negotiationSettings = WithBaudRate(transferSettings, NegotiationBaudRate);
@@ -670,6 +678,9 @@ public sealed class TransferEngine
         {
             p.Direction = TransferDirection.Receiving;
             p.Reset(status, request.TotalBytes, Math.Max(1, (int)((request.TotalBytes + TransferConstants.BlockSize - 1) / TransferConstants.BlockSize)));
+            p.TransferName = request.RootName;
+            p.TransferFileCount = request.FileCount;
+            p.TransferFolderCount = 0;
         });
         await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), WithBaudRate(currentSettings, NegotiationBaudRate), cancellationToken);
         _ui(() => _applyRemoteSettings(transferSettings));
@@ -715,6 +726,7 @@ public sealed class TransferEngine
         {
             p.Direction = TransferDirection.Receiving;
             p.Reset(IsActiveReceiveOneWay() ? "受信中(ARQなし)" : "受信中", manifest.TotalBytes, blocks);
+            p.SetTransferDetails(manifest);
         });
         return Task.CompletedTask;
     }

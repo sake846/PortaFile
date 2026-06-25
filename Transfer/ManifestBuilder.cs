@@ -14,6 +14,8 @@ public static class ManifestBuilder
             throw new InvalidOperationException("送信対象がありません。");
         }
 
+        var rootFileCount = inputPaths.Count(File.Exists);
+        var rootFolderCount = inputPaths.Count(Directory.Exists);
         var sourceFiles = new List<string>();
         var entries = new List<FileManifestEntry>();
         var rootName = DetermineRootName(inputPaths);
@@ -51,6 +53,8 @@ public static class ManifestBuilder
         {
             TransferId = Guid.NewGuid(),
             RootName = SanitizeName(rootName),
+            RootFileCount = rootFileCount,
+            RootFolderCount = rootFolderCount,
             TotalBytes = entries.Sum(x => x.Size),
             Files = entries
         };
