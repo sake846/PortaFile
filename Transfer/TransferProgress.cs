@@ -214,6 +214,15 @@ public sealed class TransferProgress : INotifyPropertyChanged
         }
     }
 
+    public string DropZoneTargetText =>
+        string.IsNullOrWhiteSpace(TransferName) ? "転送対象" : TransferName;
+
+    public string DropZoneTransferredText =>
+        $"{FormatBytes(BytesTransferred)} / {FormatBytes(TotalBytes)}";
+
+    public string DropZoneCurrentFileText =>
+        string.IsNullOrWhiteSpace(CurrentFile) ? "-" : CurrentFile;
+
     public TransferDirection Direction
     {
         get => _direction;
@@ -229,15 +238,15 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public Brush DirectionAccent => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(35, 112, 184)),
-        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(47, 142, 100)),
+        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(219, 39, 119)),
+        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(101, 163, 13)),
         _ => new SolidColorBrush(Color.FromRgb(142, 157, 171))
     };
 
     public Brush DirectionPanelBackground => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(232, 242, 252)),
-        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(230, 247, 239)),
+        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(253, 232, 240)),
+        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(236, 252, 203)),
         _ => new SolidColorBrush(Color.FromRgb(248, 251, 253))
     };
 
@@ -292,6 +301,7 @@ public sealed class TransferProgress : INotifyPropertyChanged
     {
         OnPropertyChanged(nameof(SpeedText));
         OnPropertyChanged(nameof(DropZoneLine1));
+        OnPropertyChanged(nameof(DropZoneTransferredText));
     }
 
     public static string FormatBytes(long bytes)
@@ -329,6 +339,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
             OnPropertyChanged(nameof(DropZoneLine1));
             OnPropertyChanged(nameof(DropZoneLine2));
             OnPropertyChanged(nameof(DropZoneLine3));
+            OnPropertyChanged(nameof(DropZoneTargetText));
+            OnPropertyChanged(nameof(DropZoneTransferredText));
+            OnPropertyChanged(nameof(DropZoneCurrentFileText));
         }
         return true;
     }
