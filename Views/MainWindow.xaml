@@ -182,7 +182,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Margin="0,0,0,14" BorderBrush="#D6DEE6" BorderThickness="1" CornerRadius="6" Padding="14" Background="#FFFFFF">
@@ -275,7 +274,7 @@
                     </Style>
                 </Border.Style>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="880">
-                    <TextBlock Text="{Binding Progress.DropZoneTitle}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"
+                    <TextBlock Text="{Binding Progress.DropZoneLine1}" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"
                                TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
@@ -295,8 +294,22 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
-                    <TextBlock Text="{Binding Progress.DropZoneSummary}"
+                    <TextBlock Text="{Binding Progress.DropZoneLine2}"
                                Margin="0,8,0,0" HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                <Setter Property="Foreground" Value="#617181" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                        <Setter Property="Foreground" Value="#9AA7B4" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding Progress.DropZoneLine3}"
+                               Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"
                                TextWrapping="Wrap" TextTrimming="CharacterEllipsis">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
@@ -381,64 +394,5 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="2" Margin="0,14,0,0" BorderBrush="#D6DEE6" BorderThickness="1" CornerRadius="6" Padding="12" Background="#FFFFFF">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition Width="3*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="状態" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.Status}" FontWeight="SemiBold">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                <Setter Property="Foreground" Value="{Binding Progress.DirectionAccent}" />
-                                <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsConnected}" Value="True" />
-                                            <Condition Binding="{Binding Progress.Direction}" Value="Idle" />
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter Property="Foreground" Value="{StaticResource ConnectedAccentBrush}" />
-                                    </MultiDataTrigger>
-                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                                        <Setter Property="Foreground" Value="#8E9DAB" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </StackPanel>
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="現在のファイル" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.CurrentFile}" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="速度" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.SpeedText}" />
-                </StackPanel>
-                <StackPanel Grid.Column="3">
-                    <TextBlock Text="再送" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.RetryCount}" />
-                </StackPanel>
-                <StackPanel Grid.Column="4">
-                    <TextBlock Text="エラー" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.ErrorCount}" />
-                </StackPanel>
-                <StackPanel Grid.Column="5">
-                    <TextBlock Text="送信I/O" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.SendDurationText}" />
-                </StackPanel>
-                <StackPanel Grid.Column="6">
-                    <TextBlock Text="ACK待ち" Foreground="#617181" />
-                    <TextBlock Text="{Binding Progress.AckWaitDurationText}" />
-                </StackPanel>
-            </Grid>
-        </Border>
     </Grid>
 </Window>

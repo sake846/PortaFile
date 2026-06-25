@@ -176,11 +176,17 @@ public sealed class TransferProgress : INotifyPropertyChanged
     public string AckWaitDurationText => FormatDuration(_lastAckWaitDuration);
 
     public string DropZoneTitle =>
+        DropZoneLine1;
+
+    public string DropZoneSummary =>
+        DropZoneLine2;
+
+    public string DropZoneLine1 =>
         Direction is TransferDirection.Sending or TransferDirection.Receiving && !string.IsNullOrWhiteSpace(Status)
-            ? Status
+            ? $"{Status} / 速度: {SpeedText} / 誤り数: {ErrorCount} / 再送回数: {RetryCount}"
             : "ファイルまたはフォルダをドロップ";
 
-    public string DropZoneSummary
+    public string DropZoneLine2
     {
         get
         {
@@ -190,12 +196,21 @@ public sealed class TransferProgress : INotifyPropertyChanged
             }
 
             var name = string.IsNullOrWhiteSpace(TransferName) ? "転送対象" : TransferName;
-            var itemText = TransferFolderCount > 0
-                ? $"ファイル {TransferFileCount} / フォルダ {TransferFolderCount}"
-                : $"ファイル {TransferFileCount}";
-            var sizeText = $"{FormatBytes(BytesTransferred)} / {FormatBytes(TotalBytes)}";
-            var currentText = string.IsNullOrWhiteSpace(CurrentFile) ? "" : $" / 現在: {CurrentFile}";
-            return $"{name} / {itemText} / 総サイズ {sizeText}{currentText}";
+            return $"対象: {name} / ファイル {TransferFileCount} / フォルダ {TransferFolderCount} / 転送済み: {FormatBytes(BytesTransferred)} / {FormatBytes(TotalBytes)}";
+        }
+    }
+
+    public string DropZoneLine3
+    {
+        get
+        {
+            if (Direction is not (TransferDirection.Sending or TransferDirection.Receiving))
+            {
+                return "";
+            }
+
+            var currentText = string.IsNullOrWhiteSpace(CurrentFile) ? "-" : CurrentFile;
+            return $"現在処理中: {currentText}";
         }
     }
 
@@ -273,7 +288,11 @@ public sealed class TransferProgress : INotifyPropertyChanged
         }
     }
 
-    public void RefreshTransientText() => OnPropertyChanged(nameof(SpeedText));
+    public void RefreshTransientText()
+    {
+        OnPropertyChanged(nameof(SpeedText));
+        OnPropertyChanged(nameof(DropZoneLine1));
+    }
 
     public static string FormatBytes(long bytes)
     {
@@ -307,6 +326,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
         {
             OnPropertyChanged(nameof(DropZoneTitle));
             OnPropertyChanged(nameof(DropZoneSummary));
+            OnPropertyChanged(nameof(DropZoneLine1));
+            OnPropertyChanged(nameof(DropZoneLine2));
+            OnPropertyChanged(nameof(DropZoneLine3));
         }
         return true;
     }
@@ -319,7 +341,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
             or nameof(Direction)
             or nameof(TransferName)
             or nameof(TransferFileCount)
-            or nameof(TransferFolderCount);
+            or nameof(TransferFolderCount)
+            or nameof(ErrorCount)
+            or nameof(RetryCount);
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
