@@ -2,12 +2,20 @@ using PortaFile.Protocol;
 using PortaFile.Services;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace PortaFile.Transfer;
 
 public sealed class TransferEngine
 {
     public const int NegotiationBaudRate = 38400;
+
+    private static readonly TimeSpan SendRequestTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan PostNegotiationDelay = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan ReceiveErrorDelay = TimeSpan.FromMilliseconds(500);
+    private const double TimeoutBufferSeconds = 2.0;
+    private const double MinimumTimeoutSeconds = 3.0;
+    private const double BitsPerByteWithFraming = 10.0;
 
     private readonly SerialTransport _transport;
     private readonly Func<SerialSettings> _settingsProvider;
@@ -95,65 +103,65 @@ public sealed class TransferEngine
                 p.CurrentFile = "";
             });
 
-            var built = await ManifestBuilder.BuildAsync(paths, cancellationToken);
-            _pendingManifest = built.Manifest;
-            _pendingSources = built.SourceFiles;
-            var blockCount = built.Manifest.Files.Sum(f => f.BlockCount);
-            var transferSettings = _settingsProvider();
-            var reliabilityMode = transferSettings.ReliabilityMode;
-            built.Manifest.ReliabilityMode = reliabilityMode;
+            var manifestResult = await ManifestBuilder.BuildAsync(paths, cancellationToken);
+            _pendingManifest = manifestResult.Manifest;
+            _pendingSources = manifestResult.SourceFiles;
+            var totalBlockCount = manifestResult.Manifest.Files.Sum(f => f.BlockCount);
+            var settings = _settingsProvider();
+            var reliabilityMode = settings.ReliabilityMode;
+            manifestResult.Manifest.ReliabilityMode = reliabilityMode;
 
             if (reliabilityMode == TransferReliabilityMode.OneWay)
             {
                 UpdateProgress(p =>
                 {
-                    p.Reset("片方向送信中", built.Manifest.TotalBytes, blockCount);
-                    p.SetTransferDetails(built.Manifest);
+                    p.Reset("片方向送信中", manifestResult.Manifest.TotalBytes, totalBlockCount);
+                    p.SetTransferDetails(manifestResult.Manifest);
                 });
             }
             else
             {
                 UpdateProgress(p =>
                 {
-                    p.Reset("送信要求中", built.Manifest.TotalBytes, blockCount);
-                    p.SetTransferDetails(built.Manifest);
+                    p.Reset("送信要求中", manifestResult.Manifest.TotalBytes, totalBlockCount);
+                    p.SetTransferDetails(manifestResult.Manifest);
                 });
 
                 _readyWaiter = NewWaiter();
-                var negotiationSettings = WithBaudRate(transferSettings, NegotiationBaudRate);
-                await SendJsonAsync(PacketType.SendRequest, built.Manifest.TransferId, 0,
+                var negotiationSettings = WithBaudRate(settings, NegotiationBaudRate);
+                await SendJsonAsync(PacketType.SendRequest, manifestResult.Manifest.TransferId, 0,
                     new SendRequestPayload(
                         _nodeId,
-                        built.Manifest.TransferId,
-                        built.Manifest.RootName,
-                        built.Manifest.Files.Count,
-                        built.Manifest.TotalBytes,
+                        manifestResult.Manifest.TransferId,
+                        manifestResult.Manifest.RootName,
+                        manifestResult.Manifest.Files.Count,
+                        manifestResult.Manifest.TotalBytes,
                         reliabilityMode,
-                        transferSettings.BaudRate,
-                        transferSettings.DuplexMode),
+                        settings.BaudRate,
+                        settings.DuplexMode),
                     negotiationSettings,
                     cancellationToken);
 
-                if (!await WaitWithTimeoutAsync(_readyWaiter.Task, TimeSpan.FromSeconds(5), cancellationToken))
+                if (!await WaitWithTimeoutAsync(_readyWaiter.Task, SendRequestTimeout, cancellationToken))
                 {
                     throw new TimeoutException("送信要求がタイムアウトしました。");
                 }
 
-                await Task.Delay(100, cancellationToken);
-                _transport.SetBaudRate(transferSettings.BaudRate);
+                await Task.Delay(PostNegotiationDelay, cancellationToken);
+                _transport.SetBaudRate(settings.BaudRate);
             }
 
-            await SendJsonAsync(PacketType.Manifest, built.Manifest.TransferId, 0, built.Manifest, cancellationToken);
+            await SendJsonAsync(PacketType.Manifest, manifestResult.Manifest.TransferId, 0, manifestResult.Manifest, cancellationToken);
             if (reliabilityMode == TransferReliabilityMode.OneWay)
             {
-                await SendFilesOneWayAsync(built.Manifest, built.SourceFiles, cancellationToken);
+                await SendFilesOneWayAsync(manifestResult.Manifest, manifestResult.SourceFiles, cancellationToken);
             }
             else
             {
-                await SendFilesAsync(built.Manifest, built.SourceFiles, cancellationToken);
+                await SendFilesAsync(manifestResult.Manifest, manifestResult.SourceFiles, cancellationToken);
             }
 
-            await SendJsonAsync(PacketType.TransferEnd, built.Manifest.TransferId, 0, new { }, cancellationToken);
+            await SendJsonAsync(PacketType.TransferEnd, manifestResult.Manifest.TransferId, 0, new { }, cancellationToken);
 
             UpdateProgress(p =>
             {
@@ -225,44 +233,44 @@ public sealed class TransferEngine
             await SendControlWithRetryAsync(PacketType.FileStart, manifest.TransferId, sequence++,
                 new FileStartPayload(entry.Index, entry.RelativePath, entry.Size, entry.Crc32), cancellationToken);
 
-            await using var stream = File.OpenRead(sourcePath);
+            await using var fileStream = File.OpenRead(sourcePath);
             var buffer = new byte[TransferConstants.BlockSize];
             var fileTransferred = 0L;
             var localBlock = 0;
-            var pending = new List<PendingDataBlock>();
+            var pendingBlocks = new List<PendingDataBlock>();
             var reachedEndOfFile = false;
 
-            while (!reachedEndOfFile || pending.Count > 0)
+            while (!reachedEndOfFile || pendingBlocks.Count > 0)
             {
-                while (pending.Count < TransferConstants.ArqWindowSize && !reachedEndOfFile)
+                while (pendingBlocks.Count < TransferConstants.ArqWindowSize && !reachedEndOfFile)
                 {
-                    var read = await stream.ReadAsync(buffer, cancellationToken);
-                    if (read == 0)
+                    var bytesRead = await fileStream.ReadAsync(buffer, cancellationToken);
+                    if (bytesRead == 0)
                     {
                         reachedEndOfFile = true;
                         break;
                     }
 
-                    var payload = buffer.AsSpan(0, read).ToArray();
-                    pending.Add(new PendingDataBlock(
+                    var blockPayload = buffer.AsSpan(0, bytesRead).ToArray();
+                    pendingBlocks.Add(new PendingDataBlock(
                         sequence++,
-                        payload,
+                        blockPayload,
                         fileBlockStart + localBlock,
-                        fileTransferred + read,
-                        transferred + read));
+                        fileTransferred + bytesRead,
+                        transferred + bytesRead));
 
-                    fileTransferred += read;
-                    transferred += read;
+                    fileTransferred += bytesRead;
+                    transferred += bytesRead;
                     localBlock++;
                     globalBlockIndex++;
                 }
 
-                if (pending.Count == 0)
+                if (pendingBlocks.Count == 0)
                 {
                     continue;
                 }
 
-                await SendDataWindowAsync(manifest.TransferId, pending, manifest.TotalBytes, entry.Size, cancellationToken);
+                await SendDataWindowAsync(manifest.TransferId, pendingBlocks, manifest.TotalBytes, entry.Size, cancellationToken);
             }
 
             await SendControlWithRetryAsync(PacketType.FileEnd, manifest.TransferId, sequence++,
@@ -291,25 +299,25 @@ public sealed class TransferEngine
             await SendJsonAsync(PacketType.FileStart, manifest.TransferId, sequence++,
                 new FileStartPayload(entry.Index, entry.RelativePath, entry.Size, entry.Crc32), cancellationToken);
 
-            await using var stream = File.OpenRead(sourcePath);
+            await using var fileStream = File.OpenRead(sourcePath);
             var buffer = new byte[TransferConstants.BlockSize];
             var fileTransferred = 0L;
 
             while (true)
             {
-                var read = await stream.ReadAsync(buffer, cancellationToken);
-                if (read == 0)
+                var bytesRead = await fileStream.ReadAsync(buffer, cancellationToken);
+                if (bytesRead == 0)
                 {
                     break;
                 }
 
-                var payload = buffer.AsSpan(0, read).ToArray();
+                var blockPayload = buffer.AsSpan(0, bytesRead).ToArray();
                 var sendDuration = await SendMeasuredAsync(
-                    new Packet(PacketType.Data, manifest.TransferId, sequence++, payload),
+                    new Packet(PacketType.Data, manifest.TransferId, sequence++, blockPayload),
                     cancellationToken);
 
-                transferred += read;
-                fileTransferred += read;
+                transferred += bytesRead;
+                fileTransferred += bytesRead;
                 var blockIndex = globalBlockIndex++;
                 UpdateProgress(p =>
                 {
@@ -333,8 +341,8 @@ public sealed class TransferEngine
         T payload,
         CancellationToken cancellationToken)
     {
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, _jsonOptions);
-        var packet = new Packet(type, transferId, sequence, bytes);
+        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, _jsonOptions);
+        var packet = new Packet(type, transferId, sequence, payloadBytes);
         var retries = 0;
 
         while (true)
@@ -344,10 +352,10 @@ public sealed class TransferEngine
             var sendDuration = await SendMeasuredAsync(packet, cancellationToken);
 
             var ackStopwatch = Stopwatch.StartNew();
-            var ok = await WaitWithTimeoutAsync(waiter.Task, CalculateTimeout(_settingsProvider().BaudRate), cancellationToken);
+            var isAckReceived = await WaitWithTimeoutAsync(waiter.Task, CalculateTimeout(_settingsProvider().BaudRate), cancellationToken);
             ackStopwatch.Stop();
             UpdateProgress(p => p.SetLinkTiming(sendDuration, ackStopwatch.Elapsed));
-            if (ok && waiter.Task.Result)
+            if (isAckReceived && await waiter.Task)
             {
                 return;
             }
@@ -376,39 +384,39 @@ public sealed class TransferEngine
 
     private async Task SendDataWindowAsync(
         Guid transferId,
-        List<PendingDataBlock> pending,
+        List<PendingDataBlock> pendingBlocks,
         long totalBytes,
         long currentFileSize,
         CancellationToken cancellationToken)
     {
-        while (pending.Count > 0)
+        while (pendingBlocks.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var block in pending)
+            foreach (var block in pendingBlocks)
             {
                 UpdateProgress(p => p.SetBlock(block.BlockIndex, block.RetryCount == 0 ? BlockState.Active : BlockState.Retrying));
             }
 
             var sendStopwatch = Stopwatch.StartNew();
-            foreach (var block in pending)
+            foreach (var block in pendingBlocks)
             {
                 await _transport.SendAsync(new Packet(PacketType.Data, transferId, block.Sequence, block.Payload), _settingsProvider(), cancellationToken);
             }
 
             var waiter = RegisterDataBatchAckWaiter();
             await SendJsonAsync(PacketType.DataBatchCheck, transferId, 0,
-                new DataBatchCheckPayload(pending.Select(x => x.Sequence).ToArray()), cancellationToken);
+                new DataBatchCheckPayload(pendingBlocks.Select(x => x.Sequence).ToArray()), cancellationToken);
             sendStopwatch.Stop();
 
             var ackStopwatch = Stopwatch.StartNew();
-            var ack = await WaitForDataBatchAckAsync(waiter, CalculateTimeout(_settingsProvider().BaudRate), cancellationToken);
+            var ackPayload = await WaitForDataBatchAckAsync(waiter, CalculateTimeout(_settingsProvider().BaudRate), cancellationToken);
             ackStopwatch.Stop();
             UpdateProgress(p => p.SetLinkTiming(sendStopwatch.Elapsed, ackStopwatch.Elapsed));
 
-            if (ack is null)
+            if (ackPayload is null)
             {
-                foreach (var block in pending)
+                foreach (var block in pendingBlocks)
                 {
                     block.RetryCount++;
                 }
@@ -419,19 +427,19 @@ public sealed class TransferEngine
                     p.ErrorCount++;
                 });
 
-                if (pending.All(x => x.RetryCount <= TransferConstants.MaxRetries))
+                if (pendingBlocks.All(x => x.RetryCount <= TransferConstants.MaxRetries))
                 {
                     continue;
                 }
 
-                foreach (var block in pending)
+                foreach (var block in pendingBlocks)
                 {
                     UpdateProgress(p => p.SetBlock(block.BlockIndex, BlockState.Failed));
                 }
 
                 if (await _confirmRetryAsync("最大再送回数を超えました。続行しますか？"))
                 {
-                    foreach (var block in pending)
+                    foreach (var block in pendingBlocks)
                     {
                         block.RetryCount = 0;
                     }
@@ -442,9 +450,9 @@ public sealed class TransferEngine
                 throw new OperationCanceledException("最大再送回数を超えたため中止しました。", cancellationToken);
             }
 
-            var missing = ack.MissingSequences.ToHashSet();
-            var completed = pending.Where(x => !missing.Contains(x.Sequence)).ToArray();
-            foreach (var block in completed)
+            var missingSequences = ackPayload.MissingSequences.ToHashSet();
+            var completedBlocks = pendingBlocks.Where(x => !missingSequences.Contains(x.Sequence)).ToArray();
+            foreach (var block in completedBlocks)
             {
                 UpdateProgress(p =>
                 {
@@ -455,29 +463,29 @@ public sealed class TransferEngine
                 });
             }
 
-            pending.RemoveAll(x => !missing.Contains(x.Sequence));
-            if (pending.Count == 0)
+            pendingBlocks.RemoveAll(x => !missingSequences.Contains(x.Sequence));
+            if (pendingBlocks.Count == 0)
             {
                 return;
             }
 
-            foreach (var block in pending)
+            foreach (var block in pendingBlocks)
             {
                 block.RetryCount++;
             }
 
             UpdateProgress(p =>
             {
-                p.RetryCount += pending.Count;
-                p.ErrorCount += pending.Count;
+                p.RetryCount += pendingBlocks.Count;
+                p.ErrorCount += pendingBlocks.Count;
             });
 
-            if (pending.All(x => x.RetryCount <= TransferConstants.MaxRetries))
+            if (pendingBlocks.All(x => x.RetryCount <= TransferConstants.MaxRetries))
             {
                 return;
             }
 
-            foreach (var block in pending)
+            foreach (var block in pendingBlocks)
             {
                 UpdateProgress(p => p.SetBlock(block.BlockIndex, BlockState.Failed));
             }
@@ -487,7 +495,7 @@ public sealed class TransferEngine
                 throw new OperationCanceledException("最大再送回数を超えたため中止しました。", cancellationToken);
             }
 
-            foreach (var block in pending)
+            foreach (var block in pendingBlocks)
             {
                 block.RetryCount = 0;
             }
@@ -557,7 +565,7 @@ public sealed class TransferEngine
                     p.CurrentFile = ex.Message;
                     p.ErrorCount++;
                 });
-                await Task.Delay(500, cancellationToken).ContinueWith(_ => { }, CancellationToken.None);
+                await Task.Delay(ReceiveErrorDelay, cancellationToken).ContinueWith(_ => { }, CancellationToken.None);
             }
         }
     }
@@ -687,27 +695,27 @@ public sealed class TransferEngine
         _transport.SetBaudRate(transferSettings.BaudRate);
     }
 
+    private void IgnoreReceiveRequest(string reason)
+    {
+        UpdateProgress(p =>
+        {
+            p.Status = "受信要求無視";
+            p.CurrentFile = reason;
+            p.ErrorCount++;
+        });
+    }
+
     private Task HandleManifestAsync(TransferManifest manifest, CancellationToken cancellationToken)
     {
         if (_expectedManifestTransferId is Guid expectedTransferId && expectedTransferId != manifest.TransferId)
         {
-            UpdateProgress(p =>
-            {
-                p.Status = "受信要求無視";
-                p.CurrentFile = "想定外のマニフェストです。";
-                p.ErrorCount++;
-            });
+            IgnoreReceiveRequest("想定外のマニフェストです。");
             return Task.CompletedTask;
         }
 
         if (_isBusy && _expectedManifestTransferId is null && _pendingManifest is not null)
         {
-            UpdateProgress(p =>
-            {
-                p.Status = "受信要求無視";
-                p.CurrentFile = "転送中です。";
-                p.ErrorCount++;
-            });
+            IgnoreReceiveRequest("転送中です。");
             return Task.CompletedTask;
         }
 
@@ -733,25 +741,25 @@ public sealed class TransferEngine
 
     private async Task HandleFileStartAsync(FileStartPayload payload, int sequence, Guid transferId, CancellationToken cancellationToken)
     {
-        if (!ValidateSequence(sequence, transferId, cancellationToken, out var task))
+        if (!ValidateSequence(sequence, transferId, cancellationToken, out var recoveryTask))
         {
-            await task;
+            await recoveryTask;
             return;
         }
 
         await CleanupReceiveFileAsync(deletePart: true);
         _receiveDataBuffer.Clear();
-        var manifest = _pendingManifest ?? throw new InvalidOperationException("マニフェスト未受信です。");
-        var entry = manifest.Files.Single(x => x.Index == payload.FileIndex);
-        _receivePartPath = PathResolver.CreatePartPath(manifest, entry);
+        var currentManifest = _pendingManifest ?? throw new InvalidOperationException("マニフェスト未受信です。");
+        var fileEntry = currentManifest.Files.Single(x => x.Index == payload.FileIndex);
+        _receivePartPath = PathResolver.CreatePartPath(currentManifest, fileEntry);
         _receiveFileStream = File.Create(_receivePartPath);
         _receiveFileCrc = payload.Crc32;
         _receiveCurrentFileBytes = 0;
-        _receiveCurrentEntry = entry;
+        _receiveCurrentEntry = fileEntry;
 
         UpdateProgress(p =>
         {
-            p.CurrentFile = entry.RelativePath;
+            p.CurrentFile = fileEntry.RelativePath;
             p.FilePercent = 0;
         });
 
@@ -791,9 +799,9 @@ public sealed class TransferEngine
 
     private async Task HandleOneWayDataAsync(Packet packet, CancellationToken cancellationToken)
     {
-        if (!ValidateSequence(packet.Sequence, packet.TransferId, cancellationToken, out var task))
+        if (!ValidateSequence(packet.Sequence, packet.TransferId, cancellationToken, out var recoveryTask))
         {
-            await task;
+            await recoveryTask;
             return;
         }
 
@@ -861,9 +869,9 @@ public sealed class TransferEngine
 
     private async Task HandleFileEndAsync(FileEndPayload payload, int sequence, Guid transferId, CancellationToken cancellationToken)
     {
-        if (!ValidateSequence(sequence, transferId, cancellationToken, out var task))
+        if (!ValidateSequence(sequence, transferId, cancellationToken, out var recoveryTask))
         {
-            await task;
+            await recoveryTask;
             return;
         }
 
@@ -882,8 +890,8 @@ public sealed class TransferEngine
         _receiveFileStream = null;
 
         UpdateProgress(p => p.Status = "検証中");
-        var actualCrc = await Crc32.ComputeFileAsync(_receivePartPath, cancellationToken);
-        if (actualCrc != _receiveFileCrc || actualCrc != payload.Crc32)
+        var computedCrc = await Crc32.ComputeFileAsync(_receivePartPath, cancellationToken);
+        if (computedCrc != _receiveFileCrc || computedCrc != payload.Crc32)
         {
             File.Delete(_receivePartPath);
             _receivePartPath = null;
@@ -903,12 +911,12 @@ public sealed class TransferEngine
             return;
         }
 
-        var finalPath = PathResolver.GetAvailableFinalPath(_receivePartPath);
-        File.Move(_receivePartPath, finalPath);
-        var entry = _pendingManifest?.Files.SingleOrDefault(x => x.Index == payload.FileIndex);
-        if (entry is not null)
+        var destinationPath = PathResolver.GetAvailableFinalPath(_receivePartPath);
+        File.Move(_receivePartPath, destinationPath);
+        var fileEntry = _pendingManifest?.Files.SingleOrDefault(x => x.Index == payload.FileIndex);
+        if (fileEntry is not null)
         {
-            File.SetLastWriteTimeUtc(finalPath, entry.LastWriteTimeUtc);
+            File.SetLastWriteTimeUtc(destinationPath, fileEntry.LastWriteTimeUtc);
         }
 
         _receivePartPath = null;
@@ -1052,8 +1060,8 @@ public sealed class TransferEngine
 
     private static TimeSpan CalculateTimeout(int baudRate)
     {
-        var seconds = TransferConstants.BlockSize * 10.0 / Math.Max(1, baudRate) + 2;
-        return TimeSpan.FromSeconds(Math.Max(3, seconds));
+        var seconds = TransferConstants.BlockSize * BitsPerByteWithFraming / Math.Max(1, baudRate) + TimeoutBufferSeconds;
+        return TimeSpan.FromSeconds(Math.Max(MinimumTimeoutSeconds, seconds));
     }
 
     private void ResetNegotiationBaudRateIfNeeded()

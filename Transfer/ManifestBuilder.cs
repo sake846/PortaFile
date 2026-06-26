@@ -4,6 +4,8 @@ namespace PortaFile.Transfer;
 
 public static class ManifestBuilder
 {
+    private const string DefaultTransferName = "Transfer";
+
     public static async Task<(TransferManifest Manifest, List<string> SourceFiles)> BuildAsync(
         IEnumerable<string> paths,
         CancellationToken cancellationToken)
@@ -72,7 +74,7 @@ public static class ManifestBuilder
                 : Path.GetFileNameWithoutExtension(single);
         }
 
-        return "Transfer";
+        return DefaultTransferName;
     }
 
     private static string MakeRelativePath(List<string> roots, string file)
@@ -95,6 +97,6 @@ public static class ManifestBuilder
             value = value.Replace(invalid, '_');
         }
 
-        return string.IsNullOrWhiteSpace(value) ? "Transfer" : value;
+        return string.IsNullOrWhiteSpace(value) ? DefaultTransferName : value;
     }
 }

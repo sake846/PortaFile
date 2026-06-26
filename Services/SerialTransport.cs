@@ -5,6 +5,12 @@ namespace PortaFile.Services;
 
 public sealed class SerialTransport : IDisposable
 {
+    private const int DefaultDataBits = 8;
+    private const int HalfDuplexRtsEnableDelayMs = 2;
+    private const int MinTransmitDelayMs = 5;
+    private const int TransmitDelayBufferMs = 3;
+    private const double BitsPerByteWithFraming = 10.0;
+
     private SerialPort? _serialPort;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
@@ -15,7 +21,7 @@ public sealed class SerialTransport : IDisposable
     {
         Close();
 
-        _serialPort = new SerialPort(settings.PortName, settings.BaudRate, settings.Parity, 8, StopBits.One)
+        _serialPort = new SerialPort(settings.PortName, settings.BaudRate, settings.Parity, DefaultDataBits, StopBits.One)
         {
             Handshake = Handshake.None,
             ReadTimeout = -1,
@@ -54,7 +60,7 @@ public sealed class SerialTransport : IDisposable
             if (useRts)
             {
                 _serialPort.RtsEnable = true;
-                await Task.Delay(2, cancellationToken);
+                await Task.Delay(HalfDuplexRtsEnableDelayMs, cancellationToken);
             }
 
             await _serialPort.BaseStream.WriteAsync(frame, cancellationToken);
@@ -98,7 +104,7 @@ public sealed class SerialTransport : IDisposable
 
     private static TimeSpan CalculateTransmitDelay(int byteCount, int baudRate)
     {
-        var seconds = byteCount * 10.0 / Math.Max(1, baudRate);
-        return TimeSpan.FromMilliseconds(Math.Max(5, seconds * 1000 + 3));
+        var seconds = byteCount * BitsPerByteWithFraming / Math.Max(1, baudRate);
+        return TimeSpan.FromMilliseconds(Math.Max(MinTransmitDelayMs, seconds * 1000 + TransmitDelayBufferMs));
     }
 }

@@ -1,3 +1,6 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Media;
 
 namespace PortaFile.Transfer;
@@ -21,6 +24,13 @@ public enum TransferDirection
 
 public sealed class ProgressBlock : INotifyPropertyChanged
 {
+    private static readonly Color ActiveColor = Color.FromRgb(42, 112, 184);
+    private static readonly Color DoneColor = Color.FromRgb(47, 142, 100);
+    private static readonly Color RetryingColor = Color.FromRgb(190, 128, 36);
+    private static readonly Color FailedColor = Color.FromRgb(185, 56, 56);
+    private static readonly Color VerifyingColor = Color.FromRgb(126, 87, 194);
+    private static readonly Color DefaultColor = Color.FromRgb(203, 213, 225);
+
     private BlockState _state;
 
     public BlockState State
@@ -41,12 +51,12 @@ public sealed class ProgressBlock : INotifyPropertyChanged
 
     public Brush Fill => State switch
     {
-        BlockState.Active => new SolidColorBrush(Color.FromRgb(42, 112, 184)),
-        BlockState.Done => new SolidColorBrush(Color.FromRgb(47, 142, 100)),
-        BlockState.Retrying => new SolidColorBrush(Color.FromRgb(190, 128, 36)),
-        BlockState.Failed => new SolidColorBrush(Color.FromRgb(185, 56, 56)),
-        BlockState.Verifying => new SolidColorBrush(Color.FromRgb(126, 87, 194)),
-        _ => new SolidColorBrush(Color.FromRgb(203, 213, 225))
+        BlockState.Active => new SolidColorBrush(ActiveColor),
+        BlockState.Done => new SolidColorBrush(DoneColor),
+        BlockState.Retrying => new SolidColorBrush(RetryingColor),
+        BlockState.Failed => new SolidColorBrush(FailedColor),
+        BlockState.Verifying => new SolidColorBrush(VerifyingColor),
+        _ => new SolidColorBrush(DefaultColor)
     };
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -57,6 +67,17 @@ public sealed class ProgressBlock : INotifyPropertyChanged
 
 public sealed class TransferProgress : INotifyPropertyChanged
 {
+    private static readonly Color SendingAccentColor = Color.FromRgb(219, 39, 119);
+    private static readonly Color ReceivingAccentColor = Color.FromRgb(101, 163, 13);
+    private static readonly Color DefaultAccentColor = Color.FromRgb(142, 157, 171);
+
+    private static readonly Color SendingPanelBackgroundColor = Color.FromRgb(253, 232, 240);
+    private static readonly Color ReceivingPanelBackgroundColor = Color.FromRgb(236, 252, 203);
+    private static readonly Color DefaultPanelBackgroundColor = Color.FromRgb(248, 251, 253);
+
+    private const int MaxProgressBlocks = 3000;
+    private const double BytesInKiB = 1024.0;
+
     private string _status = "未接続";
     private string _currentFile = "";
     private double _overallPercent;
@@ -238,16 +259,16 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public Brush DirectionAccent => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(219, 39, 119)),
-        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(101, 163, 13)),
-        _ => new SolidColorBrush(Color.FromRgb(142, 157, 171))
+        TransferDirection.Sending => new SolidColorBrush(SendingAccentColor),
+        TransferDirection.Receiving => new SolidColorBrush(ReceivingAccentColor),
+        _ => new SolidColorBrush(DefaultAccentColor)
     };
 
     public Brush DirectionPanelBackground => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(Color.FromRgb(253, 232, 240)),
-        TransferDirection.Receiving => new SolidColorBrush(Color.FromRgb(236, 252, 203)),
-        _ => new SolidColorBrush(Color.FromRgb(248, 251, 253))
+        TransferDirection.Sending => new SolidColorBrush(SendingPanelBackgroundColor),
+        TransferDirection.Receiving => new SolidColorBrush(ReceivingPanelBackgroundColor),
+        _ => new SolidColorBrush(DefaultPanelBackgroundColor)
     };
 
     public void Reset(string status, long totalBytes, int blocks)
@@ -268,7 +289,7 @@ public sealed class TransferProgress : INotifyPropertyChanged
         RetryCount = 0;
         ErrorCount = 0;
         Blocks.Clear();
-        for (var i = 0; i < Math.Max(1, Math.Min(blocks, 3000)); i++)
+        for (var i = 0; i < Math.Max(1, Math.Min(blocks, MaxProgressBlocks)); i++)
         {
             Blocks.Add(new ProgressBlock());
         }
@@ -309,9 +330,9 @@ public sealed class TransferProgress : INotifyPropertyChanged
         string[] units = ["B", "KiB", "MiB", "GiB"];
         var value = (double)bytes;
         var unit = 0;
-        while (value >= 1024 && unit < units.Length - 1)
+        while (value >= BytesInKiB && unit < units.Length - 1)
         {
-            value /= 1024;
+            value /= BytesInKiB;
             unit++;
         }
 

@@ -2,6 +2,9 @@ namespace PortaFile.Transfer;
 
 public static class PathResolver
 {
+    private const string PartExtension = ".part";
+    private const int MaxCandidateCount = 10000;
+
     public static string DownloadsDirectory
     {
         get
@@ -20,13 +23,13 @@ public static class PathResolver
         var targetPath = Path.Combine(DownloadsDirectory, safeRoot, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
-        return targetPath + ".part";
+        return targetPath + PartExtension;
     }
 
     public static string GetAvailableFinalPath(string partPath)
     {
-        var target = partPath.EndsWith(".part", StringComparison.OrdinalIgnoreCase)
-            ? partPath[..^5]
+        var target = partPath.EndsWith(PartExtension, StringComparison.OrdinalIgnoreCase)
+            ? partPath[..^PartExtension.Length]
             : partPath;
 
         if (!File.Exists(target) && !Directory.Exists(target))
@@ -38,7 +41,7 @@ public static class PathResolver
         var fileName = Path.GetFileNameWithoutExtension(target);
         var extension = Path.GetExtension(target);
 
-        for (var i = 1; i < 10000; i++)
+        for (var i = 1; i < MaxCandidateCount; i++)
         {
             var candidate = Path.Combine(directory, $"{fileName} ({i}){extension}");
             if (!File.Exists(candidate) && !Directory.Exists(candidate))
