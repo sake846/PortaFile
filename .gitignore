@@ -58,3 +58,6 @@ nunit-*.xml
 
 # Local release-note drafts
 RELEASE_NOTES/
+
+opencode.json
+
