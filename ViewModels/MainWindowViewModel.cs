@@ -39,6 +39,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         CancelCommand = new AsyncRelayCommand(CancelAsync, () => IsConnected);
         SelectFileCommand = new AsyncRelayCommand(SelectFilesAsync, () => IsConnected);
         OpenDownloadsCommand = new RelayCommand(OpenDownloads);
+        DragOverCommand = new RelayCommand(OnDragOver);
+        DropCommand = new RelayCommand(OnDrop);
 
         RefreshPorts();
 
@@ -125,7 +127,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             }
 
             OnPropertyChanged(nameof(IsSettingsEnabled));
-            RaiseCommandStates();
         }
     }
 
@@ -137,6 +138,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public AsyncRelayCommand CancelCommand { get; }
     public AsyncRelayCommand SelectFileCommand { get; }
     public RelayCommand OpenDownloadsCommand { get; }
+    public RelayCommand DragOverCommand { get; }
+    public RelayCommand DropCommand { get; }
 
     public bool CanAcceptFilesForSend() => _transport.IsOpen && !_engine.IsBusy;
 
@@ -160,7 +163,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        RaiseCommandStates();
         try
         {
             await _engine.SendPathsAsync(selectedPaths);
@@ -174,10 +176,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             Progress.Status = "送信失敗";
             Progress.CurrentFile = ex.Message;
             _dialogs.ShowError(ex.Message, "送信エラー");
-        }
-        finally
-        {
-            RaiseCommandStates();
         }
     }
 
@@ -233,7 +231,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task CancelAsync()
     {
         await _engine.CancelAsync();
-        RaiseCommandStates();
     }
 
     private async Task SelectFilesAsync()
@@ -329,12 +326,24 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void RaiseCommandStates()
+    private void OnDragOver(object? parameter)
     {
-        ConnectCommand.RaiseCanExecuteChanged();
-        DisconnectCommand.RaiseCanExecuteChanged();
-        CancelCommand.RaiseCanExecuteChanged();
-        SelectFileCommand.RaiseCanExecuteChanged();
+        if (parameter is System.Windows.DragEventArgs e)
+        {
+            e.Effects = e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) && CanAcceptFilesForSend()
+                ? System.Windows.DragDropEffects.Copy
+                : System.Windows.DragDropEffects.None;
+            e.Handled = true;
+        }
+    }
+
+    private async void OnDrop(object? parameter)
+    {
+        if (parameter is System.Windows.DragEventArgs e && e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            var paths = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop)!;
+            await SendPathsAsync(paths);
+        }
     }
 
     public void Dispose()
