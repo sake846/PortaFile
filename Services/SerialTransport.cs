@@ -3,7 +3,7 @@ using PortaFile.Protocol;
 
 namespace PortaFile.Services;
 
-public sealed class SerialTransport : IDisposable
+public sealed class SerialTransport : ISerialTransport, IDisposable
 {
     private const int DefaultDataBits = 8;
     private const int HalfDuplexRtsEnableDelayMs = 2;

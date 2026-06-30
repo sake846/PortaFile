@@ -1,5 +1,7 @@
 using PortaFile.Protocol;
 using PortaFile.Services;
+using PortaFile.Transfer.Core;
+using PortaFile.Transfer.Core;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -30,6 +32,7 @@ public sealed class TransferEngine
 
     private CancellationTokenSource? _receiveCts;
     private CancellationTokenSource? _transferCts;
+    private TransferSession? _session;
     private TransferManifest? _pendingManifest;
     private List<string> _pendingSources = [];
     private TaskCompletionSource<bool>? _readyWaiter;
@@ -44,7 +47,7 @@ public sealed class TransferEngine
     private long _receiveCurrentFileBytes;
     private FileManifestEntry? _receiveCurrentEntry;
     private TransferReliabilityMode _activeReceiveReliabilityMode = TransferReliabilityMode.Arq;
-    private readonly Dictionary<int, byte[]> _receiveDataBuffer = [];
+    private readonly Dictionary<int, byte[]> _receiveDataBuffer = new();
     private int _receiveNextBlockIndex;
 
     private sealed record PendingDataBlock(
