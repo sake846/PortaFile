@@ -11,7 +11,6 @@ public interface ISerialTransport : IDisposable
     bool IsOpen { get; }
     Stream Stream { get; }
     void Open(SerialSettings settings);
-    void SetBaudRate(int baudRate);
     Task SendAsync(Packet packet, SerialSettings settings, CancellationToken cancellationToken);
     void Close();
 }

@@ -33,16 +33,6 @@ public sealed class SerialTransport : ISerialTransport, IDisposable
         _serialPort.Open();
     }
 
-    public void SetBaudRate(int baudRate)
-    {
-        if (_serialPort is null)
-        {
-            throw new InvalidOperationException("Serial port is not open.");
-        }
-
-        _serialPort.BaudRate = baudRate;
-    }
-
     public async Task SendAsync(Packet packet, SerialSettings settings, CancellationToken cancellationToken)
     {
         var frame = PacketCodec.Encode(packet);

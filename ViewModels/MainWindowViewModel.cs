@@ -28,7 +28,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _engine = new TransferEngine(
             _transport,
             GetSerialSettings,
-            ApplyRemoteTransferSettings,
             Progress,
             message => _dialogs.ConfirmWarningAsync(message, "再送確認"),
             ui);
@@ -209,7 +208,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            _transport.Open(GetInitialOpenSettings(settings));
+            _transport.Open(settings);
             _engine.StartReceiving();
             IsConnected = true;
             Progress.Status = "接続済み";
@@ -267,32 +266,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             HalfDuplexControl = SelectedHalfDuplexControl,
             ReliabilityMode = SelectedReliabilityMode
         };
-    }
-
-    private static SerialSettings GetInitialOpenSettings(SerialSettings settings)
-    {
-        if (settings.ReliabilityMode != TransferReliabilityMode.Arq)
-        {
-            return settings;
-        }
-
-        return new SerialSettings
-        {
-            PortName = settings.PortName,
-            BaudRate = TransferEngine.NegotiationBaudRate,
-            Parity = settings.Parity,
-            DuplexMode = settings.DuplexMode,
-            HalfDuplexControl = settings.HalfDuplexControl,
-            ReliabilityMode = settings.ReliabilityMode
-        };
-    }
-
-    private void ApplyRemoteTransferSettings(SerialSettings settings)
-    {
-        SelectedBaudRate = BaudRates.Contains(settings.BaudRate) ? settings.BaudRate : SelectedBaudRate;
-        SelectedReliabilityMode = settings.ReliabilityMode;
-        SelectedDuplexMode = settings.DuplexMode;
-        SaveLastState();
     }
 
     private void ApplyLastState(ApplicationLastState state)

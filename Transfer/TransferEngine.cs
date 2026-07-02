@@ -9,10 +9,7 @@ namespace PortaFile.Transfer;
 
 public sealed class TransferEngine
 {
-    public const int NegotiationBaudRate = 38400;
-
     private static readonly TimeSpan SendRequestTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan PostNegotiationDelay = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan ReceiveErrorDelay = TimeSpan.FromMilliseconds(500);
     private const double TimeoutBufferSeconds = 2.0;
     private const double MinimumTimeoutSeconds = 3.0;
@@ -20,7 +17,6 @@ public sealed class TransferEngine
 
     private readonly SerialTransport _transport;
     private readonly Func<SerialSettings> _settingsProvider;
-    private readonly Action<SerialSettings> _applyRemoteSettings;
     private readonly Func<string, Task<bool>> _confirmRetryAsync;
     private readonly Action<Action> _ui;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -61,14 +57,12 @@ public sealed class TransferEngine
     public TransferEngine(
         SerialTransport transport,
         Func<SerialSettings> settingsProvider,
-        Action<SerialSettings> applyRemoteSettings,
         TransferProgress progress,
         Func<string, Task<bool>> confirmRetryAsync,
         Action<Action> ui)
     {
         _transport = transport;
         _settingsProvider = settingsProvider;
-        _applyRemoteSettings = applyRemoteSettings;
         Progress = progress;
         _confirmRetryAsync = confirmRetryAsync;
         _ui = ui;
@@ -129,7 +123,6 @@ public sealed class TransferEngine
                 });
 
                 _readyWaiter = NewWaiter();
-                var negotiationSettings = WithBaudRate(settings, NegotiationBaudRate);
                 await SendJsonAsync(PacketType.SendRequest, manifestResult.Manifest.TransferId, 0,
                     new SendRequestPayload(
                         _nodeId,
@@ -137,19 +130,13 @@ public sealed class TransferEngine
                         manifestResult.Manifest.RootName,
                         manifestResult.Manifest.Files.Count,
                         manifestResult.Manifest.TotalBytes,
-                        reliabilityMode,
-                        settings.BaudRate,
-                        settings.DuplexMode),
-                    negotiationSettings,
+                        reliabilityMode),
                     cancellationToken);
 
                 if (!await WaitWithTimeoutAsync(_readyWaiter.Task, SendRequestTimeout, cancellationToken))
                 {
                     throw new TimeoutException("送信要求がタイムアウトしました。");
                 }
-
-                await Task.Delay(PostNegotiationDelay, cancellationToken);
-                _transport.SetBaudRate(settings.BaudRate);
             }
 
             await SendJsonAsync(PacketType.Manifest, manifestResult.Manifest.TransferId, 0, manifestResult.Manifest, cancellationToken);
@@ -174,7 +161,6 @@ public sealed class TransferEngine
         }
         finally
         {
-            ResetNegotiationBaudRateIfNeeded();
             _pendingManifest = null;
             _pendingSources = [];
             _readyWaiter = null;
@@ -627,7 +613,6 @@ public sealed class TransferEngine
                     p.Status = "受信完了";
                 });
                 _pendingManifest = null;
-                ResetNegotiationBaudRateIfNeeded();
                 SetBusy(false);
                 break;
             case PacketType.Cancel:
@@ -638,7 +623,6 @@ public sealed class TransferEngine
                     p.Status = "相手側がキャンセル";
                 });
                 _pendingManifest = null;
-                ResetNegotiationBaudRateIfNeeded();
                 SetBusy(false);
                 break;
             case PacketType.Error:
@@ -656,8 +640,7 @@ public sealed class TransferEngine
     {
         if (_isBusy && (_pendingManifest is null || request.NodeId > _nodeId))
         {
-            await SendJsonAsync(PacketType.Busy, transferId, 0, new BusyPayload(_nodeId, "転送中です。"),
-                WithBaudRate(_settingsProvider(), NegotiationBaudRate), cancellationToken);
+            await SendJsonAsync(PacketType.Busy, transferId, 0, new BusyPayload(_nodeId, "転送中です。"), cancellationToken);
             return;
         }
 
@@ -673,16 +656,6 @@ public sealed class TransferEngine
         _receiveDataBuffer.Clear();
         _receiveNextBlockIndex = 0;
         var status = IsActiveReceiveOneWay() ? "受信準備完了(ARQなし)" : "受信準備完了";
-        var currentSettings = _settingsProvider();
-        var transferSettings = new SerialSettings
-        {
-            PortName = currentSettings.PortName,
-            BaudRate = request.BaudRate > 0 ? request.BaudRate : currentSettings.BaudRate,
-            Parity = currentSettings.Parity,
-            DuplexMode = request.DuplexMode,
-            HalfDuplexControl = currentSettings.HalfDuplexControl,
-            ReliabilityMode = request.ReliabilityMode
-        };
         UpdateProgress(p =>
         {
             p.Direction = TransferDirection.Receiving;
@@ -691,9 +664,7 @@ public sealed class TransferEngine
             p.TransferFileCount = request.FileCount;
             p.TransferFolderCount = 0;
         });
-        await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), WithBaudRate(currentSettings, NegotiationBaudRate), cancellationToken);
-        _ui(() => _applyRemoteSettings(transferSettings));
-        _transport.SetBaudRate(transferSettings.BaudRate);
+        await SendJsonAsync(PacketType.Ready, transferId, 0, new ReadyPayload(_nodeId), cancellationToken);
     }
 
     private void IgnoreReceiveRequest(string reason)
@@ -1065,24 +1036,4 @@ public sealed class TransferEngine
         return TimeSpan.FromSeconds(Math.Max(MinimumTimeoutSeconds, seconds));
     }
 
-    private void ResetNegotiationBaudRateIfNeeded()
-    {
-        if (!_transport.IsOpen || _settingsProvider().ReliabilityMode != TransferReliabilityMode.Arq)
-        {
-            return;
-        }
-
-        _transport.SetBaudRate(NegotiationBaudRate);
-    }
-
-    private static SerialSettings WithBaudRate(SerialSettings settings, int baudRate) =>
-        new()
-        {
-            PortName = settings.PortName,
-            BaudRate = baudRate,
-            Parity = settings.Parity,
-            DuplexMode = settings.DuplexMode,
-            HalfDuplexControl = settings.HalfDuplexControl,
-            ReliabilityMode = settings.ReliabilityMode
-        };
 }
