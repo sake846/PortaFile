@@ -54,10 +54,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public IReadOnlyList<int> BaudRates { get; } =
     [
-        9600,
-        19200,
-        38400,
-        57600,
         115200,
         230400,
         460800,

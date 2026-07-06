@@ -60,10 +60,6 @@ PortaFile supports these configuration items:
 
 Supported baud rate candidates:
 
-- 9600
-- 19200
-- 38400
-- 57600
 - 115200
 - 230400
 - 460800
