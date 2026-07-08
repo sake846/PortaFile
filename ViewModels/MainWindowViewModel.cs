@@ -12,6 +12,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly TransferEngine _engine;
     private readonly IUserDialogService _dialogs;
     private readonly ILastStateService _lastStateService;
+    private readonly AppLocalization _localization;
     private readonly DispatcherTimer _speedTimer = new();
     private string? _selectedPortName;
     private int _selectedBaudRate = 115200;
@@ -22,16 +23,31 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isConnected;
     private bool _isDisposed;
 
-    public MainWindowViewModel(IUserDialogService dialogs, ILastStateService lastStateService, Action<Action> ui)
+    public MainWindowViewModel(IUserDialogService dialogs, ILastStateService lastStateService, AppLocalization localization, Action<Action> ui)
     {
         _dialogs = dialogs;
         _lastStateService = lastStateService;
+        _localization = localization;
+
+        ReliabilityModes = [
+            new(localization.Option_ReliabilityArq, TransferReliabilityMode.Arq),
+            new(localization.Option_ReliabilityOneWay, TransferReliabilityMode.OneWay)
+        ];
+        DuplexModes = [
+            new(localization.Option_DuplexFull, DuplexMode.FullDuplex),
+            new(localization.Option_DuplexHalf, DuplexMode.HalfDuplex)
+        ];
+        HalfDuplexControls = [
+            new(localization.Option_HalfDuplexDriver, HalfDuplexControl.DriverManaged),
+            new(localization.Option_HalfDuplexRts, HalfDuplexControl.Rts)
+        ];
+
         ApplyLastState(_lastStateService.Load());
         _engine = new TransferEngine(
             _transport,
             GetSerialSettings,
             Progress,
-            message => _dialogs.ConfirmWarningAsync(message, "再送確認"),
+            message => _dialogs.ConfirmWarningAsync(message, _localization.Title_ConfirmRetry),
             ui);
 
         RefreshPortsCommand = new RelayCommand(RefreshPorts);
@@ -50,6 +66,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _speedTimer.Start();
     }
 
+    public AppLocalization Localization => _localization;
+
     public TransferProgress Progress { get; } = new();
 
     public ObservableCollection<string> PortNames { get; } = [];
@@ -65,23 +83,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         3000000
     ];
 
-    public IReadOnlyList<OptionItem<TransferReliabilityMode>> ReliabilityModes { get; } =
-    [
-        new("ARQあり", TransferReliabilityMode.Arq),
-        new("ARQなし片方向", TransferReliabilityMode.OneWay)
-    ];
+    public IReadOnlyList<OptionItem<TransferReliabilityMode>> ReliabilityModes { get; }
 
-    public IReadOnlyList<OptionItem<DuplexMode>> DuplexModes { get; } =
-    [
-        new("全二重", DuplexMode.FullDuplex),
-        new("半二重", DuplexMode.HalfDuplex)
-    ];
+    public IReadOnlyList<OptionItem<DuplexMode>> DuplexModes { get; }
 
-    public IReadOnlyList<OptionItem<HalfDuplexControl>> HalfDuplexControls { get; } =
-    [
-        new("ドライバ任せ", HalfDuplexControl.DriverManaged),
-        new("RTS制御", HalfDuplexControl.Rts)
-    ];
+    public IReadOnlyList<OptionItem<HalfDuplexControl>> HalfDuplexControls { get; }
 
     public string? SelectedPortName
     {
@@ -144,13 +150,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (!_transport.IsOpen)
         {
-            _dialogs.ShowInformation("先にCOMポートへ接続してください。", "PortaFile");
+            _dialogs.ShowInformation(_localization.Message_ConnectFirst, "PortaFile");
             return;
         }
 
         if (_engine.IsBusy)
         {
-            _dialogs.ShowInformation("転送中です。", "PortaFile");
+            _dialogs.ShowInformation(_localization.Message_Transferring, "PortaFile");
             return;
         }
 
@@ -172,7 +178,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         {
             Progress.Status = "送信失敗";
             Progress.CurrentFile = ex.Message;
-            _dialogs.ShowError(ex.Message, "送信エラー");
+            _dialogs.ShowError(ex.Message, _localization.Title_SendError);
         }
     }
 
@@ -202,7 +208,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             var settings = GetSerialSettings();
             if (string.IsNullOrWhiteSpace(settings.PortName))
             {
-                _dialogs.ShowWarning("COMポートを選択してください。", "PortaFile");
+                _dialogs.ShowWarning(_localization.Message_SelectComPort, "PortaFile");
                 return;
             }
 
@@ -213,7 +219,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _dialogs.ShowError(ex.Message, "接続エラー");
+            _dialogs.ShowError(ex.Message, _localization.Title_ConnectError);
         }
     }
 
@@ -232,7 +238,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private async Task SelectFilesAsync()
     {
-        var files = _dialogs.SelectFiles("送信するファイルを選択", _sendFileDirectory);
+        var files = _dialogs.SelectFiles(_localization.Title_SelectFiles, _sendFileDirectory);
         if (files.Length > 0)
         {
             _sendFileDirectory = Path.GetDirectoryName(files[0]);
@@ -249,7 +255,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _dialogs.ShowError(ex.Message, "保存場所を開けません");
+            _dialogs.ShowError(ex.Message, _localization.Title_CannotOpenFolder);
         }
     }
 
@@ -288,7 +294,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 DuplexMode = SelectedDuplexMode,
                 HalfDuplexControl = SelectedHalfDuplexControl,
                 ReliabilityMode = SelectedReliabilityMode,
-                SendFileDirectory = _sendFileDirectory
+                SendFileDirectory = _sendFileDirectory,
+                UiLanguage = _lastStateService.Load().UiLanguage
             };
             _lastStateService.Save(state);
         }

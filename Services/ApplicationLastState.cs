@@ -11,4 +11,5 @@ public sealed class ApplicationLastState
     public HalfDuplexControl HalfDuplexControl { get; init; } = HalfDuplexControl.DriverManaged;
     public TransferReliabilityMode ReliabilityMode { get; init; } = TransferReliabilityMode.Arq;
     public string? SendFileDirectory { get; init; }
+    public string? UiLanguage { get; init; } = "auto";
 }

@@ -23,34 +23,34 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <WrapPanel>
-                    <TextBlock Text="COM" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding Localization.Label_Port}" Margin="0,0,8,0" />
                     <ComboBox ItemsSource="{Binding PortNames}"
                               SelectedItem="{Binding SelectedPortName}"
                               IsEnabled="{Binding IsSettingsEnabled}" />
-                    <Button Content="更新" Command="{Binding RefreshPortsCommand}" MinWidth="70" />
+                    <Button Content="{Binding Localization.Button_Refresh}" Command="{Binding RefreshPortsCommand}" MinWidth="70" />
 
-                    <TextBlock Text="速度" Margin="18,0,8,0" />
+                    <TextBlock Text="{Binding Localization.Label_BaudRate}" Margin="18,0,8,0" />
                     <ComboBox ItemsSource="{Binding BaudRates}"
                               SelectedItem="{Binding SelectedBaudRate}"
                               IsEnabled="{Binding IsSettingsEnabled}" />
                 </WrapPanel>
 
                 <WrapPanel Grid.Row="1" Margin="0,10,0,0">
-                    <TextBlock Text="転送方式" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding Localization.Label_ReliabilityMode}" Margin="0,0,8,0" />
                     <ComboBox ItemsSource="{Binding ReliabilityModes}"
                               DisplayMemberPath="DisplayName"
                               SelectedValuePath="Value"
                               SelectedValue="{Binding SelectedReliabilityMode}"
                               IsEnabled="{Binding IsSettingsEnabled}" />
 
-                    <TextBlock Text="通信" Margin="18,0,8,0" />
+                    <TextBlock Text="{Binding Localization.Label_DuplexMode}" Margin="18,0,8,0" />
                     <ComboBox ItemsSource="{Binding DuplexModes}"
                               DisplayMemberPath="DisplayName"
                               SelectedValuePath="Value"
                               SelectedValue="{Binding SelectedDuplexMode}"
                               IsEnabled="{Binding IsSettingsEnabled}" />
 
-                    <TextBlock Text="半二重制御" Margin="18,0,8,0" />
+                    <TextBlock Text="{Binding Localization.Label_HalfDuplexControl}" Margin="18,0,8,0" />
                     <ComboBox ItemsSource="{Binding HalfDuplexControls}"
                               DisplayMemberPath="DisplayName"
                               SelectedValuePath="Value"
@@ -64,13 +64,13 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <WrapPanel Grid.Column="0">
-                        <Button Content="接続" Command="{Binding ConnectCommand}" />
-                        <Button Content="切断" Command="{Binding DisconnectCommand}" />
-                        <Button Content="キャンセル" Command="{Binding CancelCommand}" />
+                        <Button Content="{Binding Localization.Button_Connect}" Command="{Binding ConnectCommand}" />
+                        <Button Content="{Binding Localization.Button_Disconnect}" Command="{Binding DisconnectCommand}" />
+                        <Button Content="{Binding Localization.Button_Cancel}" Command="{Binding CancelCommand}" />
                     </WrapPanel>
                     <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
-                        <Button Content="送信ファイルを選択" Command="{Binding SelectFileCommand}" MinWidth="130" />
-                        <Button Content="受信したフォルダを開く" Command="{Binding OpenDownloadsCommand}" MinWidth="130" />
+                        <Button Content="{Binding Localization.Button_SelectFile}" Command="{Binding SelectFileCommand}" MinWidth="130" />
+                        <Button Content="{Binding Localization.Button_OpenDownloads}" Command="{Binding OpenDownloadsCommand}" MinWidth="130" />
                     </WrapPanel>
                 </Grid>
             </Grid>
@@ -116,7 +116,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Text="ファイルまたはフォルダをドロップ" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Localization.Label_DropFiles}" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                                     <Setter Property="Foreground" Value="#17212B" />
@@ -135,7 +135,7 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        <TextBlock Text="接続済みの相手へ、相対パスと更新日時を保持して送信します"
+                        <TextBlock Text="{Binding Localization.Label_Description}"
                                    Margin="0,8,0,0" HorizontalAlignment="Center" TextAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
@@ -178,13 +178,13 @@
                                 <ColumnDefinition Width="80" />
                                 <ColumnDefinition Width="60" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="状態" Foreground="#617181" />
+                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Status}" Foreground="#617181" />
                             <TextBlock Grid.Column="1" Text="{Binding Progress.Status}" FontWeight="SemiBold" Foreground="{Binding Progress.DirectionAccent}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="2" Text="対象" Foreground="#617181" />
+                            <TextBlock Grid.Column="2" Text="{Binding Localization.Label_Target}" Foreground="#617181" />
                             <TextBlock Grid.Column="3" Text="{Binding Progress.DropZoneTargetText}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="4" Text="ファイル" Foreground="#617181" />
+                            <TextBlock Grid.Column="4" Text="{Binding Localization.Label_Files}" Foreground="#617181" />
                             <TextBlock Grid.Column="5" Text="{Binding Progress.TransferFileCount}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="6" Text="フォルダ" Foreground="#617181" />
+                            <TextBlock Grid.Column="6" Text="{Binding Localization.Label_Folders}" Foreground="#617181" />
                             <TextBlock Grid.Column="7" Text="{Binding Progress.TransferFolderCount}" FontFamily="Consolas" TextAlignment="Right" />
                         </Grid>
 
@@ -199,13 +199,13 @@
                                 <ColumnDefinition Width="80" />
                                 <ColumnDefinition Width="60" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="速度" Foreground="#617181" />
+                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Speed}" Foreground="#617181" />
                             <TextBlock Grid.Column="1" Text="{Binding Progress.SpeedText}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="2" Text="転送済み" Foreground="#617181" />
+                            <TextBlock Grid.Column="2" Text="{Binding Localization.Label_Transferred}" Foreground="#617181" />
                             <TextBlock Grid.Column="3" Text="{Binding Progress.DropZoneTransferredText}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="4" Text="誤り数" Foreground="#617181" />
+                            <TextBlock Grid.Column="4" Text="{Binding Localization.Label_Errors}" Foreground="#617181" />
                             <TextBlock Grid.Column="5" Text="{Binding Progress.ErrorCount}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="6" Text="再送回数" Foreground="#617181" />
+                            <TextBlock Grid.Column="6" Text="{Binding Localization.Label_Retries}" Foreground="#617181" />
                             <TextBlock Grid.Column="7" Text="{Binding Progress.RetryCount}" FontFamily="Consolas" TextAlignment="Right" />
                         </Grid>
 
@@ -214,7 +214,7 @@
                                 <ColumnDefinition Width="110" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="現在処理中" Foreground="#617181" />
+                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_CurrentFile}" Foreground="#617181" />
                             <TextBlock Grid.Column="1" Text="{Binding Progress.DropZoneCurrentFileText}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Grid>
@@ -228,7 +228,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Margin="0,0,8,0">
                     <DockPanel>
-                        <TextBlock Text="全体" Width="96" />
+                        <TextBlock Text="{Binding Localization.Label_Overall}" Width="96" />
                         <TextBlock Text="{Binding Progress.OverallPercent, StringFormat={}{0:0.0}%}" HorizontalAlignment="Right" DockPanel.Dock="Right" />
                     </DockPanel>
                     <ProgressBar Value="{Binding Progress.OverallPercent}" Maximum="100">
@@ -250,7 +250,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="8,0,0,0">
                     <DockPanel>
-                        <TextBlock Text="現在ファイル" Width="96" />
+                        <TextBlock Text="{Binding Localization.Label_CurrentFileProgress}" Width="96" />
                         <TextBlock Text="{Binding Progress.FilePercent, StringFormat={}{0:0.0}%}" HorizontalAlignment="Right" DockPanel.Dock="Right" />
                     </DockPanel>
                     <ProgressBar Value="{Binding Progress.FilePercent}" Maximum="100">

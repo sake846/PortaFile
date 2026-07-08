@@ -22,9 +22,11 @@ public partial class App : Application
         base.OnStartup(e);
 
         var lastStateService = new LastStateService();
+        var lastState = lastStateService.Load();
+        var localization = new AppLocalization(lastState);
         var mainWindow = new MainWindow();
         var dialogService = new WindowsUserDialogService(mainWindow);
-        var viewModel = new MainWindowViewModel(dialogService, lastStateService, action => mainWindow.Dispatcher.Invoke(action));
+        var viewModel = new MainWindowViewModel(dialogService, lastStateService, localization, action => mainWindow.Dispatcher.Invoke(action));
 
         mainWindow.DataContext = viewModel;
         mainWindow.Show();
