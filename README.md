@@ -1,113 +1,90 @@
 # PortaFile
 
-PortaFile is a Windows WPF application for transferring files and folders
-between two PCs over a COM port.
+**English** | [日本語](./README.ja.md)
 
-Both PCs run PortaFile. The sender drops files or folders onto the application
-window, and PortaFile transfers them to the peer while preserving folder
-structure and validating data with CRC-32.
+PortaFile is a Windows WPF application for transferring files and folders between two PCs over a COM port (serial communication).
+By running PortaFile on both machines, you can initiate a transfer simply by dragging and dropping files or folders onto the sender window. The tool preserves folder structures and verifies data integrity using CRC-32 checksums.
 
 ## Features
 
-- Send files, multiple files, or folders by drag and drop
-- Preserve relative paths when transferring folders
-- 1-to-1 serial communication over a COM port
-- Full-duplex and half-duplex modes
-- Optional RTS direction control for half-duplex communication
-- Packet-level CRC-32 and file-level CRC-32 validation
-- ACK/NAK based retransmission
-- Transfer cancellation from either side
-- Duplicate destination filenames are renamed instead of overwritten
-- Progress view inspired by the Windows defragmentation block display
+- **Easy Drag & Drop**: Send single files, multiple files, or entire directory trees by dropping them onto the window.
+- **Directory Structure Preservation**: Preserves the relative path structure when transferring folders.
+- **1-to-1 Serial Communication**: Secure file transfer over COM ports without needing an internet connection.
+- **Reliability Mode Selection**: Toggles between high-reliability transfer with ACK/NAK based retransmission (ARQ mode) and high-speed one-way streaming without reception acknowledgments (One-Way mode).
+- **Flexible Duplex Settings**: Easily toggle between Full-duplex and Half-duplex modes, with optional RTS direction control for half-duplex.
+- **Dual CRC-32 Validation**: Data integrity verified at both the packet level and the overall file level.
+- **Robust Flow Control**: Implements ACK/NAK based automatic packet retransmission in ARQ mode.
+- **Bidirectional Cancellation**: Safely cancel an active transfer from either the sender or receiver side at any time.
+- **Smart Conflict Resolution**: Auto-renames duplicate filenames at the destination instead of overwriting existing files.
+- **Defrag-style Progress View**: Visually tracks block-by-block progress, inspired by the classic Windows defragmentation display.
 
-## Requirements
+## System Requirements
 
-- Windows 11 64-bit
-- .NET 10 SDK
-- A serial connection between the two PCs
-
-## Build
-
-```powershell
-dotnet build
-```
-
-The project targets `net10.0-windows` and uses WPF.
+- **OS**: Windows 10 / 11 64-bit
+- **Framework/SDK**: .NET 10 SDK
+- **Hardware**: Serial communication link (e.g., cross/null-modem cable) connecting the two PCs.
 
 ## Usage
 
 1. Start PortaFile on both PCs.
-2. Select the COM port and serial settings on each side.
-3. Choose the communication mode:
+2. Select the appropriate **COM port** and **serial configurations** on each machine.
+3. Choose the **reliability mode** (ARQ or One-Way).
+4. Choose the **communication mode**:
    - Full-duplex
    - Half-duplex
-   - Half-duplex with RTS control
-4. Drop one or more files, or a folder, onto the sender window.
-5. Received files are saved under a `Downloads` folder next to the executable.
+   - Half-duplex + RTS Control
+5. Drag and drop files or folders onto the sender's window.
+6. Transferred files will be saved inside the `Downloads` directory, created in the same folder as the executable.
 
-During reception, files are written as `.part` files first. After CRC-32
-verification succeeds, they are renamed to their final filenames.
+*Note: Incoming files are temporarily saved with a `.part` extension and renamed to their actual name once CRC-32 verification succeeds.*
 
-## Serial Settings
+## Build
 
-PortaFile supports these configuration items:
+### Build the Project
+```powershell
+dotnet build
+```
+This is a WPF application targeting `net10.0-windows`.
 
-- COM port
-- Baud rate
-- Parity
-- Full-duplex or half-duplex mode
-- Half-duplex direction control
+## Serial Configuration
 
-Supported baud rate candidates:
+PortaFile supports the following serial configuration options:
 
-- 115200
-- 230400
-- 460800
-- 921600
-- 1000000
-- 2000000
-- 3000000
+- **COM Port Selection**
+- **Parity Bit Configuration**
+- **Reliability Mode**: ARQ (Reliable with ACK/NAK) / One-Way (One-way stream)
+- **Duplex Mode**: Full-duplex / Half-duplex / Half-duplex with RTS direction control
+- **Baud Rate Candidates**:
+  - 115200 / 230400 / 460800 / 921600 / 1000000 / 2000000 / 3000000
+
+## Protocol Overview
+
+PortaFile uses a custom packet-based protocol to manage file transfer states and send data chunks.
+
+### Packet Types
+`HELLO` / `SEND_REQUEST` / `READY` / `BUSY` / `MANIFEST` / `FILE_START` / `DATA` / `ACK` / `NAK` / `FILE_END` / `FILE_OK` / `FILE_ERROR` / `TRANSFER_END` / `CANCEL` / `ERROR` / `DATA_BATCH_CHECK` / `DATA_BATCH_ACK`
+
+### Transmission Details
+Files are split and sent in **10 KiB** data packets. Each packet carries a CRC-32 checksum. If the receiver encounters a CRC mismatch, timeout, or an unexpected packet sequence number, an automatic retransmission is triggered (only in ARQ mode) using ACK/NAK signaling.
 
 ## Project Structure
 
 ```text
 PortaFile/
-├─ Models/
-├─ Protocol/
-├─ Services/
-├─ Transfer/
-├─ ViewModels/
-├─ Views/
-└─ docs/
+├── Models/        # Selection and display models
+├── Protocol/      # Packet definition, encoding/decoding, and CRC-32 math
+├── Services/      # Serial port configurations, connection handling, and dialog integrations
+├── Transfer/      # Manifest creation, path resolution, progress tracking, and transfer engine
+├── ViewModels/    # MVVM ViewModels, commands, and data bindings
+├── Views/         # WPF Window layouts (MainWindow, etc.)
+└── docs/          # Functional requirements document (requirements.md)
 ```
 
-- `Views/`: WPF views. `MainWindow.xaml.cs` only creates the ViewModel and bridges view-specific events such as drag and drop
-- `ViewModels/`: screen state, commands, and binding logic
-- `Models/`: display and selection models used by ViewModels
-- `Protocol/`: packet types, packet encoding, and CRC-32 support
-- `Services/`: serial port settings, transport layer, and Windows dialog integration
-- `Transfer/`: manifest creation, path resolution, progress, and transfer engine
-- `docs/requirements.md`: functional requirements
+## Technical Details
 
-## Protocol Overview
+- **Tech Stack**: C# / WPF (.NET 10)
+- **Serial Connection**: Built natively on top of `System.IO.Ports`.
 
-PortaFile exchanges typed packets such as:
+## License
 
-- `HELLO`
-- `SEND_REQUEST`
-- `READY`
-- `BUSY`
-- `MANIFEST`
-- `FILE_START`
-- `DATA`
-- `ACK`
-- `NAK`
-- `FILE_END`
-- `FILE_OK`
-- `FILE_ERROR`
-- `TRANSFER_END`
-- `CANCEL`
-- `ERROR`
-
-Data packets use 10 KiB blocks. Retransmission is triggered by CRC mismatch,
-timeout, or unexpected sequence numbers.
+This project is licensed under the [MIT License](./LICENSE).
