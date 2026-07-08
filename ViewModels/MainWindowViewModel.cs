@@ -11,6 +11,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly SerialTransport _transport = new();
     private readonly TransferEngine _engine;
     private readonly IUserDialogService _dialogs;
+    private readonly ILastStateService _lastStateService;
     private readonly DispatcherTimer _speedTimer = new();
     private string? _selectedPortName;
     private int _selectedBaudRate = 115200;
@@ -21,10 +22,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isConnected;
     private bool _isDisposed;
 
-    public MainWindowViewModel(IUserDialogService dialogs, Action<Action> ui)
+    public MainWindowViewModel(IUserDialogService dialogs, ILastStateService lastStateService, Action<Action> ui)
     {
         _dialogs = dialogs;
-        ApplyLastState(ApplicationLastState.Load());
+        _lastStateService = lastStateService;
+        ApplyLastState(_lastStateService.Load());
         _engine = new TransferEngine(
             _transport,
             GetSerialSettings,
@@ -278,7 +280,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            new ApplicationLastState
+            var state = new ApplicationLastState
             {
                 PortName = SelectedPortName,
                 BaudRate = SelectedBaudRate,
@@ -287,7 +289,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 HalfDuplexControl = SelectedHalfDuplexControl,
                 ReliabilityMode = SelectedReliabilityMode,
                 SendFileDirectory = _sendFileDirectory
-            }.Save();
+            };
+            _lastStateService.Save(state);
         }
         catch
         {

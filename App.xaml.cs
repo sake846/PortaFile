@@ -21,9 +21,10 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        var lastStateService = new LastStateService();
         var mainWindow = new MainWindow();
         var dialogService = new WindowsUserDialogService(mainWindow);
-        var viewModel = new MainWindowViewModel(dialogService, action => mainWindow.Dispatcher.Invoke(action));
+        var viewModel = new MainWindowViewModel(dialogService, lastStateService, action => mainWindow.Dispatcher.Invoke(action));
 
         mainWindow.DataContext = viewModel;
         mainWindow.Show();
