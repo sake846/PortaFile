@@ -169,52 +169,100 @@
 
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="206" />
+                                <ColumnDefinition Width="382" />
                                 <ColumnDefinition Width="142" />
-                                <ColumnDefinition Width="52" />
-                                <ColumnDefinition Width="330" />
-                                <ColumnDefinition Width="70" />
-                                <ColumnDefinition Width="62" />
-                                <ColumnDefinition Width="80" />
-                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="150" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Status}" Foreground="#617181" />
-                            <TextBlock Grid.Column="1" Text="{Binding Progress.Status}" FontWeight="SemiBold" Foreground="{Binding Progress.DirectionAccent}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="2" Text="{Binding Localization.Label_Target}" Foreground="#617181" />
-                            <TextBlock Grid.Column="3" Text="{Binding Progress.DropZoneTargetText}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="4" Text="{Binding Localization.Label_Files}" Foreground="#617181" />
-                            <TextBlock Grid.Column="5" Text="{Binding Progress.TransferFileCount}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="6" Text="{Binding Localization.Label_Folders}" Foreground="#617181" />
-                            <TextBlock Grid.Column="7" Text="{Binding Progress.TransferFolderCount}" FontFamily="Consolas" TextAlignment="Right" />
+                            
+                            <Grid Grid.Column="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Status}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.Status}" FontWeight="SemiBold" Foreground="{Binding Progress.DirectionAccent}" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            
+                            <Grid Grid.Column="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Target}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.DropZoneTargetText}" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            
+                            <Grid Grid.Column="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Files}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.TransferFileCount}" FontFamily="Consolas" />
+                            </Grid>
+                            
+                            <Grid Grid.Column="3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Folders}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.TransferFolderCount}" FontFamily="Consolas" />
+                            </Grid>
                         </Grid>
 
                         <Grid Grid.Row="1" Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="206" />
+                                <ColumnDefinition Width="382" />
                                 <ColumnDefinition Width="142" />
-                                <ColumnDefinition Width="76" />
-                                <ColumnDefinition Width="250" />
-                                <ColumnDefinition Width="70" />
-                                <ColumnDefinition Width="62" />
-                                <ColumnDefinition Width="80" />
-                                <ColumnDefinition Width="60" />
+                                <ColumnDefinition Width="150" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Speed}" Foreground="#617181" />
-                            <TextBlock Grid.Column="1" Text="{Binding Progress.SpeedText}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="2" Text="{Binding Localization.Label_Transferred}" Foreground="#617181" />
-                            <TextBlock Grid.Column="3" Text="{Binding Progress.DropZoneTransferredText}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="4" Text="{Binding Localization.Label_Errors}" Foreground="#617181" />
-                            <TextBlock Grid.Column="5" Text="{Binding Progress.ErrorCount}" FontFamily="Consolas" TextAlignment="Right" />
-                            <TextBlock Grid.Column="6" Text="{Binding Localization.Label_Retries}" Foreground="#617181" />
-                            <TextBlock Grid.Column="7" Text="{Binding Progress.RetryCount}" FontFamily="Consolas" TextAlignment="Right" />
+                            
+                            <Grid Grid.Column="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Speed}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.SpeedText}" FontFamily="Consolas" />
+                            </Grid>
+                            
+                            <Grid Grid.Column="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Transferred}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.DropZoneTransferredText}" FontFamily="Consolas" />
+                            </Grid>
+                            
+                            <Grid Grid.Column="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Errors}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.ErrorCount}" FontFamily="Consolas" />
+                            </Grid>
+                            
+                            <Grid Grid.Column="3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Localization.Label_Retries}" Foreground="#617181" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Progress.RetryCount}" FontFamily="Consolas" />
+                            </Grid>
                         </Grid>
 
                         <Grid Grid.Row="2" Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_CurrentFile}" Foreground="#617181" />
+                            <TextBlock Grid.Column="0" Text="{Binding Localization.Label_CurrentFile}" Foreground="#617181" Margin="0,0,8,0" />
                             <TextBlock Grid.Column="1" Text="{Binding Progress.DropZoneCurrentFileText}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Grid>
