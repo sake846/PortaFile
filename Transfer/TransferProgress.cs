@@ -32,6 +32,8 @@ public sealed class ProgressBlock : INotifyPropertyChanged
     private static readonly Color DefaultColor = Color.FromRgb(203, 213, 225);
 
     private BlockState _state;
+    private uint? _dataHash;
+    private Brush? _dataBrush;
 
     public BlockState State
     {
@@ -49,15 +51,103 @@ public sealed class ProgressBlock : INotifyPropertyChanged
         }
     }
 
-    public Brush Fill => State switch
+    public uint? DataHash
     {
-        BlockState.Active => new SolidColorBrush(ActiveColor),
-        BlockState.Done => new SolidColorBrush(DoneColor),
-        BlockState.Retrying => new SolidColorBrush(RetryingColor),
-        BlockState.Failed => new SolidColorBrush(FailedColor),
-        BlockState.Verifying => new SolidColorBrush(VerifyingColor),
-        _ => new SolidColorBrush(DefaultColor)
-    };
+        get => _dataHash;
+        set
+        {
+            if (_dataHash == value)
+            {
+                return;
+            }
+
+            _dataHash = value;
+            _dataBrush = value.HasValue ? new SolidColorBrush(HashToColor(value.Value)) : null;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Fill));
+        }
+    }
+
+    public void SetPayload(ReadOnlySpan<byte> payload)
+    {
+        DataHash = ComputeHash(payload);
+    }
+
+    public Brush Fill
+    {
+        get
+        {
+            if (State == BlockState.Pending)
+            {
+                return new SolidColorBrush(DefaultColor);
+            }
+
+            if (State == BlockState.Failed)
+            {
+                return new SolidColorBrush(FailedColor);
+            }
+
+            if (_dataBrush is not null)
+            {
+                return _dataBrush;
+            }
+
+            return State switch
+            {
+                BlockState.Active => new SolidColorBrush(ActiveColor),
+                BlockState.Done => new SolidColorBrush(DoneColor),
+                BlockState.Retrying => new SolidColorBrush(RetryingColor),
+                BlockState.Verifying => new SolidColorBrush(VerifyingColor),
+                _ => new SolidColorBrush(DefaultColor)
+            };
+        }
+    }
+
+    public static uint ComputeHash(ReadOnlySpan<byte> data)
+    {
+        if (data.IsEmpty)
+        {
+            return 0;
+        }
+
+        uint hash = 2166136261u;
+        foreach (var b in data)
+        {
+            hash = (hash ^ b) * 16777619u;
+        }
+
+        return hash;
+    }
+
+    public static Color HashToColor(uint hash)
+    {
+        double hue = hash % 360;
+        double saturation = 0.65 + (((hash >> 8) & 0x1F) / 100.0);
+        double lightness = 0.45 + (((hash >> 16) & 0x0F) / 100.0);
+        return HslToRgb(hue, Math.Clamp(saturation, 0.6, 0.95), Math.Clamp(lightness, 0.4, 0.6));
+    }
+
+    private static Color HslToRgb(double h, double s, double l)
+    {
+        double c = (1 - Math.Abs((2 * l) - 1)) * s;
+        double x = c * (1 - Math.Abs(((h / 60.0) % 2) - 1));
+        double m = l - (c / 2.0);
+
+        double r = 0, g = 0, b = 0;
+
+        if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+        else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+        else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+        else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+        else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+        else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+
+        byte red = (byte)Math.Clamp((r + m) * 255.0, 0, 255);
+        byte green = (byte)Math.Clamp((g + m) * 255.0, 0, 255);
+        byte blue = (byte)Math.Clamp((b + m) * 255.0, 0, 255);
+
+        return Color.FromRgb(red, green, blue);
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -271,6 +361,14 @@ public sealed class TransferProgress : INotifyPropertyChanged
         _ => new SolidColorBrush(DefaultPanelBackgroundColor)
     };
 
+    private int _activeBlockIndex = -1;
+
+    public int ActiveBlockIndex
+    {
+        get => _activeBlockIndex;
+        set => SetField(ref _activeBlockIndex, value);
+    }
+
     public void Reset(string status, long totalBytes, int blocks)
     {
         _dataStartedAt = null;
@@ -288,6 +386,7 @@ public sealed class TransferProgress : INotifyPropertyChanged
         FilePercent = 0;
         RetryCount = 0;
         ErrorCount = 0;
+        ActiveBlockIndex = -1;
         Blocks.Clear();
         for (var i = 0; i < Math.Max(1, Math.Min(blocks, MaxProgressBlocks)); i++)
         {
@@ -310,11 +409,17 @@ public sealed class TransferProgress : INotifyPropertyChanged
         OnPropertyChanged(nameof(AckWaitDurationText));
     }
 
-    public void SetBlock(int index, BlockState state)
+    public void SetBlock(int index, BlockState state, byte[]? payload = null)
     {
         if (index >= 0 && index < Blocks.Count)
         {
+            if (payload is not null && payload.Length > 0)
+            {
+                Blocks[index].SetPayload(payload);
+            }
+
             Blocks[index].State = state;
+            ActiveBlockIndex = index;
         }
     }
 

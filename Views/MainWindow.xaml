@@ -321,7 +321,7 @@
             </Grid>
 
             <Border Grid.Row="2" BorderBrush="#D6DEE6" BorderThickness="1" CornerRadius="6" Padding="12" Background="#FFFFFF">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" behaviors:BlockScrollBehavior.ActiveBlockIndex="{Binding Progress.ActiveBlockIndex}">
                     <ItemsControl ItemsSource="{Binding Progress.Blocks}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -330,7 +330,30 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Rectangle Width="12" Height="12" Margin="2" Fill="{Binding Fill}" RadiusX="1" RadiusY="1" />
+                                <Rectangle Width="12" Height="12" Margin="2" Fill="{Binding Fill}" RadiusX="1" RadiusY="1">
+                                    <Rectangle.Style>
+                                        <Style TargetType="Rectangle">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding State}" Value="Retrying">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard x:Name="BlinkStoryboard">
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                 From="1.0" To="0.2"
+                                                                                 Duration="0:0:0.3"
+                                                                                 AutoReverse="True"
+                                                                                 RepeatBehavior="Forever" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <StopStoryboard BeginStoryboardName="BlinkStoryboard" />
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Rectangle.Style>
+                                </Rectangle>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

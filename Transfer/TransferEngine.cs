@@ -312,7 +312,7 @@ public sealed class TransferEngine
                     p.BytesTransferred = transferred;
                     p.OverallPercent = manifest.TotalBytes == 0 ? 100 : transferred * 100.0 / manifest.TotalBytes;
                     p.FilePercent = entry.Size == 0 ? 100 : fileTransferred * 100.0 / entry.Size;
-                    p.SetBlock(blockIndex, BlockState.Done);
+                    p.SetBlock(blockIndex, BlockState.Done, blockPayload);
                 });
             }
 
@@ -382,7 +382,7 @@ public sealed class TransferEngine
 
             foreach (var block in pendingBlocks)
             {
-                UpdateProgress(p => p.SetBlock(block.BlockIndex, block.RetryCount == 0 ? BlockState.Active : BlockState.Retrying));
+                UpdateProgress(p => p.SetBlock(block.BlockIndex, block.RetryCount == 0 ? BlockState.Active : BlockState.Retrying, block.Payload));
             }
 
             var sendStopwatch = Stopwatch.StartNew();
@@ -443,7 +443,7 @@ public sealed class TransferEngine
             {
                 UpdateProgress(p =>
                 {
-                    p.SetBlock(block.BlockIndex, BlockState.Done);
+                    p.SetBlock(block.BlockIndex, BlockState.Done, block.Payload);
                     p.BytesTransferred = Math.Max(p.BytesTransferred, block.TotalBytesAfterBlock);
                     p.OverallPercent = totalBytes == 0 ? 100 : p.BytesTransferred * 100.0 / totalBytes;
                     p.FilePercent = currentFileSize == 0 ? 100 : block.FileBytesAfterBlock * 100.0 / currentFileSize;
@@ -835,7 +835,7 @@ public sealed class TransferEngine
             p.BytesTransferred = total;
             p.OverallPercent = p.TotalBytes == 0 ? 100 : total * 100.0 / p.TotalBytes;
             p.FilePercent = currentEntry is null || currentEntry.Size == 0 ? 100 : currentFileBytes * 100.0 / currentEntry.Size;
-            p.SetBlock(blockIndex, BlockState.Done);
+            p.SetBlock(blockIndex, BlockState.Done, payload);
         });
     }
 
