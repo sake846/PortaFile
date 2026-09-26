@@ -1,5 +1,4 @@
 using System.IO.Ports;
-using System.Windows.Threading;
 using PortaFile.Models;
 using PortaFile.Services;
 using PortaFile.Transfer;
@@ -13,7 +12,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IUserDialogService _dialogs;
     private readonly ILastStateService _lastStateService;
     private readonly AppLocalization _localization;
-    private readonly DispatcherTimer _speedTimer = new();
     private string? _selectedPortName;
     private int _selectedBaudRate = 115200;
     private TransferReliabilityMode _selectedReliabilityMode = TransferReliabilityMode.Arq;
@@ -60,10 +58,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         DropCommand = new RelayCommand(OnDrop);
 
         RefreshPorts();
-
-        _speedTimer.Interval = TimeSpan.FromSeconds(1);
-        _speedTimer.Tick += (_, _) => Progress.RefreshTransientText();
-        _speedTimer.Start();
     }
 
     public AppLocalization Localization => _localization;
@@ -334,7 +328,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         _isDisposed = true;
         SaveLastState();
-        _speedTimer.Stop();
         _engine.Stop();
         _transport.Dispose();
     }

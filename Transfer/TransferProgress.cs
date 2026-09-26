@@ -286,45 +286,6 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public string AckWaitDurationText => FormatDuration(_lastAckWaitDuration);
 
-    public string DropZoneTitle =>
-        DropZoneLine1;
-
-    public string DropZoneSummary =>
-        DropZoneLine2;
-
-    public string DropZoneLine1 =>
-        Direction is TransferDirection.Sending or TransferDirection.Receiving && !string.IsNullOrWhiteSpace(Status)
-            ? $"{Status} / 速度: {SpeedText} / 誤り数: {ErrorCount} / 再送回数: {RetryCount}"
-            : "ファイルまたはフォルダをドロップ";
-
-    public string DropZoneLine2
-    {
-        get
-        {
-            if (Direction is not (TransferDirection.Sending or TransferDirection.Receiving))
-            {
-                return "接続済みの相手へ、相対パスと更新日時を保持して送信します";
-            }
-
-            var name = string.IsNullOrWhiteSpace(TransferName) ? "転送対象" : TransferName;
-            return $"対象: {name} / ファイル {TransferFileCount} / フォルダ {TransferFolderCount} / 転送済み: {FormatBytes(BytesTransferred)} / {FormatBytes(TotalBytes)}";
-        }
-    }
-
-    public string DropZoneLine3
-    {
-        get
-        {
-            if (Direction is not (TransferDirection.Sending or TransferDirection.Receiving))
-            {
-                return "";
-            }
-
-            var currentText = string.IsNullOrWhiteSpace(CurrentFile) ? "-" : CurrentFile;
-            return $"現在処理中: {currentText}";
-        }
-    }
-
     public string DropZoneTargetText =>
         string.IsNullOrWhiteSpace(TransferName) ? "転送対象" : TransferName;
 
@@ -423,13 +384,6 @@ public sealed class TransferProgress : INotifyPropertyChanged
         }
     }
 
-    public void RefreshTransientText()
-    {
-        OnPropertyChanged(nameof(SpeedText));
-        OnPropertyChanged(nameof(DropZoneLine1));
-        OnPropertyChanged(nameof(DropZoneTransferredText));
-    }
-
     public static string FormatBytes(long bytes)
     {
         string[] units = ["B", "KiB", "MiB", "GiB"];
@@ -460,11 +414,6 @@ public sealed class TransferProgress : INotifyPropertyChanged
         OnPropertyChanged(propertyName);
         if (AffectsDropZone(propertyName))
         {
-            OnPropertyChanged(nameof(DropZoneTitle));
-            OnPropertyChanged(nameof(DropZoneSummary));
-            OnPropertyChanged(nameof(DropZoneLine1));
-            OnPropertyChanged(nameof(DropZoneLine2));
-            OnPropertyChanged(nameof(DropZoneLine3));
             OnPropertyChanged(nameof(DropZoneTargetText));
             OnPropertyChanged(nameof(DropZoneTransferredText));
             OnPropertyChanged(nameof(DropZoneCurrentFileText));

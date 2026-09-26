@@ -1,6 +1,5 @@
 using PortaFile.Protocol;
 using PortaFile.Services;
-using PortaFile.Transfer.Core;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -1018,17 +1017,8 @@ public sealed class TransferEngine
         return true;
     }
 
-    private static async Task<bool> WaitWithTimeoutAsync(Task<bool> task, TimeSpan timeout, CancellationToken cancellationToken)
-    {
-        var delay = Task.Delay(timeout, cancellationToken);
-        var completed = await Task.WhenAny(task, delay);
-        if (completed != task)
-        {
-            return false;
-        }
-
-        return await task;
-    }
+    private static async Task<bool> WaitWithTimeoutAsync(Task<bool> task, TimeSpan timeout, CancellationToken cancellationToken) =>
+        await WaitWithTimeoutAsync((Task)task, timeout, cancellationToken) && await task;
 
     private static TimeSpan CalculateTimeout(int baudRate)
     {
