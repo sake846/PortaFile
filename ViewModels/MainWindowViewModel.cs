@@ -26,6 +26,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _dialogs = dialogs;
         _lastStateService = lastStateService;
         _localization = localization;
+        VersionText = ReadVersion(localization.Label_VersionUnknown);
 
         ReliabilityModes = [
             new(localization.Option_ReliabilityArq, TransferReliabilityMode.Arq),
@@ -89,6 +90,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetField(ref _selectedPortName, value);
     }
 
+    public string VersionText { get; }
+
     public int SelectedBaudRate
     {
         get => _selectedBaudRate;
@@ -137,6 +140,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public RelayCommand OpenDownloadsCommand { get; }
     public RelayCommand DragOverCommand { get; }
     public RelayCommand DropCommand { get; }
+
+    private static string ReadVersion(string fallback)
+    {
+        try
+        {
+            var version = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "version.txt")).Trim();
+            return string.IsNullOrEmpty(version) ? fallback : version;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
 
     public bool CanAcceptFilesForSend() => _transport.IsOpen && !_engine.IsBusy;
 

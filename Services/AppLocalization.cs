@@ -81,6 +81,18 @@ namespace PortaFile.Services
         // 表示文言プロパティ定義
         public string Label_Port => "COM";
 
+        public string Label_Version => _language switch
+        {
+            UiLanguage.English => "Version",
+            _ => "バージョン"
+        };
+
+        public string Label_VersionUnknown => _language switch
+        {
+            UiLanguage.English => "Unknown",
+            _ => "不明"
+        };
+
         public string Label_BaudRate => _language switch
         {
             UiLanguage.English => "Baud Rate",

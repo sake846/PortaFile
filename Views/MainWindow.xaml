@@ -81,6 +81,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" MinHeight="118" BorderThickness="2" CornerRadius="6" Padding="18">
@@ -359,6 +360,11 @@
                     </ItemsControl>
                 </ScrollViewer>
             </Border>
+
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,2,0">
+                <TextBlock Text="{Binding Localization.Label_Version}" Foreground="#71808D" FontSize="11" Margin="0,0,4,0" />
+                <TextBlock Text="{Binding VersionText}" Foreground="#71808D" FontSize="11" />
+            </StackPanel>
         </Grid>
 
     </Grid>
