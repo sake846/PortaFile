@@ -22,14 +22,24 @@ public enum TransferDirection
     Receiving
 }
 
+internal static class ProgressBrush
+{
+    public static Brush Create(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+}
+
 public sealed class ProgressBlock : INotifyPropertyChanged
 {
-    private static readonly Color ActiveColor = Color.FromRgb(42, 112, 184);
-    private static readonly Color DoneColor = Color.FromRgb(47, 142, 100);
-    private static readonly Color RetryingColor = Color.FromRgb(190, 128, 36);
-    private static readonly Color FailedColor = Color.FromRgb(185, 56, 56);
-    private static readonly Color VerifyingColor = Color.FromRgb(126, 87, 194);
-    private static readonly Color DefaultColor = Color.FromRgb(203, 213, 225);
+    private static readonly Brush ActiveBrush = ProgressBrush.Create(Color.FromRgb(42, 112, 184));
+    private static readonly Brush DoneBrush = ProgressBrush.Create(Color.FromRgb(47, 142, 100));
+    private static readonly Brush RetryingBrush = ProgressBrush.Create(Color.FromRgb(190, 128, 36));
+    private static readonly Brush FailedBrush = ProgressBrush.Create(Color.FromRgb(185, 56, 56));
+    private static readonly Brush VerifyingBrush = ProgressBrush.Create(Color.FromRgb(126, 87, 194));
+    private static readonly Brush DefaultBrush = ProgressBrush.Create(Color.FromRgb(203, 213, 225));
 
     private BlockState _state;
     private uint? _dataHash;
@@ -62,7 +72,7 @@ public sealed class ProgressBlock : INotifyPropertyChanged
             }
 
             _dataHash = value;
-            _dataBrush = value.HasValue ? new SolidColorBrush(HashToColor(value.Value)) : null;
+            _dataBrush = value.HasValue ? ProgressBrush.Create(HashToColor(value.Value)) : null;
             OnPropertyChanged();
             OnPropertyChanged(nameof(Fill));
         }
@@ -79,12 +89,12 @@ public sealed class ProgressBlock : INotifyPropertyChanged
         {
             if (State == BlockState.Pending)
             {
-                return new SolidColorBrush(DefaultColor);
+                return DefaultBrush;
             }
 
             if (State == BlockState.Failed)
             {
-                return new SolidColorBrush(FailedColor);
+                return FailedBrush;
             }
 
             if (_dataBrush is not null)
@@ -94,11 +104,11 @@ public sealed class ProgressBlock : INotifyPropertyChanged
 
             return State switch
             {
-                BlockState.Active => new SolidColorBrush(ActiveColor),
-                BlockState.Done => new SolidColorBrush(DoneColor),
-                BlockState.Retrying => new SolidColorBrush(RetryingColor),
-                BlockState.Verifying => new SolidColorBrush(VerifyingColor),
-                _ => new SolidColorBrush(DefaultColor)
+                BlockState.Active => ActiveBrush,
+                BlockState.Done => DoneBrush,
+                BlockState.Retrying => RetryingBrush,
+                BlockState.Verifying => VerifyingBrush,
+                _ => DefaultBrush
             };
         }
     }
@@ -157,16 +167,16 @@ public sealed class ProgressBlock : INotifyPropertyChanged
 
 public sealed class TransferProgress : INotifyPropertyChanged
 {
-    private static readonly Color SendingAccentColor = Color.FromRgb(219, 39, 119);
-    private static readonly Color ReceivingAccentColor = Color.FromRgb(101, 163, 13);
-    private static readonly Color DefaultAccentColor = Color.FromRgb(142, 157, 171);
+    private static readonly Brush SendingAccentBrush = ProgressBrush.Create(Color.FromRgb(219, 39, 119));
+    private static readonly Brush ReceivingAccentBrush = ProgressBrush.Create(Color.FromRgb(101, 163, 13));
+    private static readonly Brush DefaultAccentBrush = ProgressBrush.Create(Color.FromRgb(142, 157, 171));
+    private static readonly Brush SendingPanelBackgroundBrush = ProgressBrush.Create(Color.FromRgb(253, 232, 240));
+    private static readonly Brush ReceivingPanelBackgroundBrush = ProgressBrush.Create(Color.FromRgb(236, 252, 203));
+    private static readonly Brush DefaultPanelBackgroundBrush = ProgressBrush.Create(Color.FromRgb(248, 251, 253));
 
-    private static readonly Color SendingPanelBackgroundColor = Color.FromRgb(253, 232, 240);
-    private static readonly Color ReceivingPanelBackgroundColor = Color.FromRgb(236, 252, 203);
-    private static readonly Color DefaultPanelBackgroundColor = Color.FromRgb(248, 251, 253);
-
-    private const int MaxProgressBlocks = 3000;
+    private const int MaxProgressBlocks = 512;
     private const double BytesInKiB = 1024.0;
+    private int _totalBlocks = 1;
 
     private string _status = "未接続";
     private string _currentFile = "";
@@ -310,16 +320,16 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public Brush DirectionAccent => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(SendingAccentColor),
-        TransferDirection.Receiving => new SolidColorBrush(ReceivingAccentColor),
-        _ => new SolidColorBrush(DefaultAccentColor)
+        TransferDirection.Sending => SendingAccentBrush,
+        TransferDirection.Receiving => ReceivingAccentBrush,
+        _ => DefaultAccentBrush
     };
 
     public Brush DirectionPanelBackground => Direction switch
     {
-        TransferDirection.Sending => new SolidColorBrush(SendingPanelBackgroundColor),
-        TransferDirection.Receiving => new SolidColorBrush(ReceivingPanelBackgroundColor),
-        _ => new SolidColorBrush(DefaultPanelBackgroundColor)
+        TransferDirection.Sending => SendingPanelBackgroundBrush,
+        TransferDirection.Receiving => ReceivingPanelBackgroundBrush,
+        _ => DefaultPanelBackgroundBrush
     };
 
     private int _activeBlockIndex = -1;
@@ -332,6 +342,7 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public void Reset(string status, long totalBytes, int blocks)
     {
+        _totalBlocks = Math.Max(1, blocks);
         _dataStartedAt = null;
         _lastDataAt = null;
         _lastSendDuration = null;
@@ -349,7 +360,7 @@ public sealed class TransferProgress : INotifyPropertyChanged
         ErrorCount = 0;
         ActiveBlockIndex = -1;
         Blocks.Clear();
-        for (var i = 0; i < Math.Max(1, Math.Min(blocks, MaxProgressBlocks)); i++)
+        for (var i = 0; i < Math.Min(_totalBlocks, MaxProgressBlocks); i++)
         {
             Blocks.Add(new ProgressBlock());
         }
@@ -372,15 +383,18 @@ public sealed class TransferProgress : INotifyPropertyChanged
 
     public void SetBlock(int index, BlockState state, byte[]? payload = null)
     {
-        if (index >= 0 && index < Blocks.Count)
+        if (index >= 0 && index < _totalBlocks)
         {
-            if (payload is not null && payload.Length > 0)
+            // A visible block represents a range when the transfer exceeds the display cap.
+            var displayIndex = (int)((long)index * Blocks.Count / _totalBlocks);
+            var block = Blocks[displayIndex];
+            if (payload is { Length: > 0 } && block.DataHash is null)
             {
-                Blocks[index].SetPayload(payload);
+                block.SetPayload(payload);
             }
 
-            Blocks[index].State = state;
-            ActiveBlockIndex = index;
+            block.State = state;
+            ActiveBlockIndex = displayIndex;
         }
     }
 

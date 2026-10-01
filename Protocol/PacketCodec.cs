@@ -56,32 +56,16 @@ public static class PacketCodec
 
     private static async Task ReadUntilMagicAsync(Stream stream, byte[] header, CancellationToken cancellationToken)
     {
-        var window = new Queue<byte>(4);
-        while (true)
+        await ReadExactAsync(stream, header.AsMemory(0, 4), cancellationToken);
+        while (BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(0, 4)) != Magic)
         {
-            var one = new byte[1];
-            await ReadExactAsync(stream, one, cancellationToken);
-            window.Enqueue(one[0]);
-            if (window.Count > 4)
-            {
-                window.Dequeue();
-            }
-
-            if (window.Count != 4)
-            {
-                continue;
-            }
-
-            var bytes = window.ToArray();
-            if (BinaryPrimitives.ReadUInt32LittleEndian(bytes) != Magic)
-            {
-                continue;
-            }
-
-            bytes.CopyTo(header, 0);
-            await ReadExactAsync(stream, header.AsMemory(4), cancellationToken);
-            return;
+            header[0] = header[1];
+            header[1] = header[2];
+            header[2] = header[3];
+            await ReadExactAsync(stream, header.AsMemory(3, 1), cancellationToken);
         }
+
+        await ReadExactAsync(stream, header.AsMemory(4), cancellationToken);
     }
 
     private static async Task ReadExactAsync(Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)

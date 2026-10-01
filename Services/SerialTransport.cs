@@ -1,4 +1,5 @@
 using System.IO.Ports;
+using System.Diagnostics;
 using PortaFile.Protocol;
 
 namespace PortaFile.Services;
@@ -39,27 +40,40 @@ public sealed class SerialTransport : ISerialTransport, IDisposable
         await _writeLock.WaitAsync(cancellationToken);
         try
         {
-            if (_serialPort is null)
-            {
-                throw new InvalidOperationException("Serial port is not open.");
-            }
+            var port = _serialPort ?? throw new InvalidOperationException("Serial port is not open.");
 
             var useRts = settings.DuplexMode == DuplexMode.HalfDuplex &&
                          settings.HalfDuplexControl == HalfDuplexControl.Rts;
 
-            if (useRts)
+            try
             {
-                _serialPort.RtsEnable = true;
-                await Task.Delay(HalfDuplexRtsEnableDelayMs, cancellationToken);
+                if (useRts)
+                {
+                    port.RtsEnable = true;
+                    await Task.Delay(HalfDuplexRtsEnableDelayMs, cancellationToken);
+                }
+
+                var transmissionStarted = useRts ? Stopwatch.GetTimestamp() : 0;
+                await port.BaseStream.WriteAsync(frame, cancellationToken);
+                await port.BaseStream.FlushAsync(cancellationToken);
+
+                if (useRts)
+                {
+                    // Flush usually waits for transmission; retain any remaining wire-time margin for buffered adapters.
+                    var remaining = CalculateTransmitDelay(frame.Length, settings.BaudRate)
+                        - Stopwatch.GetElapsedTime(transmissionStarted);
+                    if (remaining > TimeSpan.Zero)
+                    {
+                        await Task.Delay(remaining, cancellationToken);
+                    }
+                }
             }
-
-            await _serialPort.BaseStream.WriteAsync(frame, cancellationToken);
-            await _serialPort.BaseStream.FlushAsync(cancellationToken);
-
-            if (useRts)
+            finally
             {
-                await Task.Delay(CalculateTransmitDelay(frame.Length, settings.BaudRate), cancellationToken);
-                _serialPort.RtsEnable = false;
+                if (useRts)
+                {
+                    port.RtsEnable = false;
+                }
             }
         }
         finally
