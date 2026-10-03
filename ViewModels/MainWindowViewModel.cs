@@ -26,7 +26,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _dialogs = dialogs;
         _lastStateService = lastStateService;
         _localization = localization;
-        VersionText = ReadVersion(localization.Label_VersionUnknown);
+        VersionText = AppVersionProvider.GetVersion(localization.Label_VersionUnknown);
 
         ReliabilityModes = [
             new(localization.Option_ReliabilityArq, TransferReliabilityMode.Arq),
@@ -141,18 +141,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public RelayCommand DragOverCommand { get; }
     public RelayCommand DropCommand { get; }
 
-    private static string ReadVersion(string fallback)
-    {
-        try
-        {
-            var version = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "version.txt")).Trim();
-            return string.IsNullOrEmpty(version) ? fallback : version;
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
 
     public bool CanAcceptFilesForSend() => _transport.IsOpen && !_engine.IsBusy;
 
